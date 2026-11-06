@@ -17,8 +17,8 @@ concurrency:
 
 jobs:
   check:
-    # Skip anywhere but a fork, so this can never run upstream.
-    if: github.event.repository.fork == true
+    # Never run in the upstream repository.
+    if: github.repository != 'heygen-com/hyperframes'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -31,12 +31,11 @@ jobs:
         run: |
           git init -q fork
           cd fork
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git remote add upstream "https://github.com/${UPSTREAM}.git"
-          git fetch -q --filter=blob:none origin "${GITHUB_REF_NAME}"
-          git fetch -q --filter=blob:none upstream "${UPSTREAM_BRANCH}"
+          git fetch -q origin "${GITHUB_REF_NAME}"
           git switch -q --detach FETCH_HEAD
-          git switch -q --detach "origin/${GITHUB_REF_NAME}" 2>/dev/null || git switch -q --detach "$(git rev-parse --verify FETCH_HEAD)"
+          git fetch -q upstream "+refs/heads/${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
           git config user.name "fork-upstream-check"
           git config user.email "fork-upstream-check@users.noreply.github.com"
 
@@ -44,12 +43,13 @@ jobs:
         working-directory: fork
         run: |
           OURS="$(git rev-parse HEAD)"
-          THEIRS="$(git rev-parse "upstream/${UPSTREAM_BRANCH}" 2>/dev/null || git ls-remote upstream "refs/heads/${UPSTREAM_BRANCH}" | cut -f1)"
-          git fetch -q --filter=blob:none upstream "+refs/heads/${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
           THEIRS="$(git rev-parse "upstream/${UPSTREAM_BRANCH}")"
           BEHIND="$(git rev-list --count "HEAD..${THEIRS}")"
           AHEAD="$(git rev-list --count "${THEIRS}..HEAD")"
           echo "behind=${BEHIND} ahead=${AHEAD}"
+
+          gh label create "$LABEL" -R "$GITHUB_REPOSITORY" --color 0E8A16 \
+            --description "This fork is behind upstream" --force >/dev/null
 
           OPEN="$(gh issue list -R "$GITHUB_REPOSITORY" --label "$LABEL" --state open --json number --jq '.[0].number // empty')"
 
@@ -61,6 +61,7 @@ jobs:
             exit 0
           fi
 
+          CONFLICTS=""
           if git merge --no-commit --no-ff "$THEIRS" >/dev/null 2>&1; then
             MERGE="A merge should apply cleanly."
           else
@@ -78,7 +79,7 @@ jobs:
             echo "- Latest upstream release: ${RELEASE}"
             echo "- Last checked: $(date -u '+%Y-%m-%d %H:%M UTC')"
             echo "- ${MERGE}"
-            if [ -n "${CONFLICTS:-}" ]; then
+            if [ -n "$CONFLICTS" ]; then
               echo
               echo '```text'
               echo "$CONFLICTS" | head -50
@@ -94,15 +95,12 @@ jobs:
             echo '```'
             echo
             echo "To update, see FORK.md. This check never changes your code."
-          } > report.md
-
-          gh label create "$LABEL" -R "$GITHUB_REPOSITORY" --color 0E8A16 \
-            --description "This fork is behind upstream" --force >/dev/null
+          } > ../report.md
 
           if [ -n "$OPEN" ]; then
-            gh issue edit "$OPEN" -R "$GITHUB_REPOSITORY" --body-file report.md
+            gh issue edit "$OPEN" -R "$GITHUB_REPOSITORY" --body-file ../report.md
             echo "Updated issue #${OPEN}"
           else
             gh issue create -R "$GITHUB_REPOSITORY" --title "HyperFrames has updates to review" \
-              --label "$LABEL" --body-file report.md
+              --label "$LABEL" --body-file ../report.md
           fi
