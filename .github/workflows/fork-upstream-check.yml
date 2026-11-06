@@ -1,0 +1,108 @@
+# Fork-only: checks once a day whether heygen-com/hyperframes has moved ahead of this fork.
+# It only reports, in one issue labelled upstream-update. It never merges or changes code.
+name: Fork upstream check
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: fork-upstream-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    # Skip anywhere but a fork, so this can never run upstream.
+    if: github.event.repository.fork == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM: heygen-com/hyperframes
+      UPSTREAM_BRANCH: main
+      LABEL: upstream-update
+    steps:
+      - name: Fetch this fork and upstream
+        run: |
+          git init -q fork
+          cd fork
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git remote add upstream "https://github.com/${UPSTREAM}.git"
+          git fetch -q --filter=blob:none origin "${GITHUB_REF_NAME}"
+          git fetch -q --filter=blob:none upstream "${UPSTREAM_BRANCH}"
+          git switch -q --detach FETCH_HEAD
+          git switch -q --detach "origin/${GITHUB_REF_NAME}" 2>/dev/null || git switch -q --detach "$(git rev-parse --verify FETCH_HEAD)"
+          git config user.name "fork-upstream-check"
+          git config user.email "fork-upstream-check@users.noreply.github.com"
+
+      - name: Compare and report
+        working-directory: fork
+        run: |
+          OURS="$(git rev-parse HEAD)"
+          THEIRS="$(git rev-parse "upstream/${UPSTREAM_BRANCH}" 2>/dev/null || git ls-remote upstream "refs/heads/${UPSTREAM_BRANCH}" | cut -f1)"
+          git fetch -q --filter=blob:none upstream "+refs/heads/${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
+          THEIRS="$(git rev-parse "upstream/${UPSTREAM_BRANCH}")"
+          BEHIND="$(git rev-list --count "HEAD..${THEIRS}")"
+          AHEAD="$(git rev-list --count "${THEIRS}..HEAD")"
+          echo "behind=${BEHIND} ahead=${AHEAD}"
+
+          OPEN="$(gh issue list -R "$GITHUB_REPOSITORY" --label "$LABEL" --state open --json number --jq '.[0].number // empty')"
+
+          if [ "$BEHIND" -eq 0 ]; then
+            echo "Up to date with ${UPSTREAM}."
+            if [ -n "$OPEN" ]; then
+              gh issue close "$OPEN" -R "$GITHUB_REPOSITORY" --comment "Up to date with upstream."
+            fi
+            exit 0
+          fi
+
+          if git merge --no-commit --no-ff "$THEIRS" >/dev/null 2>&1; then
+            MERGE="A merge should apply cleanly."
+          else
+            CONFLICTS="$(git diff --name-only --diff-filter=U)"
+            MERGE="A merge would conflict in these files:"
+          fi
+          git merge --abort 2>/dev/null || true
+
+          RELEASE="$(gh release view -R "$UPSTREAM" --json tagName,publishedAt --jq '"\(.tagName) (\(.publishedAt[0:10]))"' 2>/dev/null || echo "unknown")"
+
+          # Commit subjects stay inside a code block so they cannot mention people or link issues.
+          {
+            echo "This fork is **${BEHIND} commits behind** \`${UPSTREAM}\` and ${AHEAD} ahead."
+            echo
+            echo "- Latest upstream release: ${RELEASE}"
+            echo "- Last checked: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "- ${MERGE}"
+            if [ -n "${CONFLICTS:-}" ]; then
+              echo
+              echo '```text'
+              echo "$CONFLICTS" | head -50
+              echo '```'
+            fi
+            echo
+            echo "[Review all the changes](https://github.com/${UPSTREAM}/compare/${OURS}...${THEIRS})"
+            echo
+            echo "Newest commits:"
+            echo
+            echo '```text'
+            git log --no-merges --format='%ad  %s' --date=short "HEAD..${THEIRS}" | head -30 | sed 's/```/ /g' | cut -c1-140
+            echo '```'
+            echo
+            echo "To update, see FORK.md. This check never changes your code."
+          } > report.md
+
+          gh label create "$LABEL" -R "$GITHUB_REPOSITORY" --color 0E8A16 \
+            --description "This fork is behind upstream" --force >/dev/null
+
+          if [ -n "$OPEN" ]; then
+            gh issue edit "$OPEN" -R "$GITHUB_REPOSITORY" --body-file report.md
+            echo "Updated issue #${OPEN}"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "HyperFrames has updates to review" \
+              --label "$LABEL" --body-file report.md
+          fi
