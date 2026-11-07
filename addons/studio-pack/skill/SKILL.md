@@ -61,10 +61,13 @@ $PY $PACK/studio_reframe.py talk.mp4 talk.vertical.mp4 --preview talk.box.mp4 --
 $PY $PACK/studio_reframe.py talk.mp4 talk.square.mp4 --aspect 1:1          # 9:16 (default), 4:5, 1:1
 ```
 
-- Follows faces (front and side), then people, then movement; restarts at every hard cut; holds still while the
-  subject stays within `--dead-zone` (12% of the crop), then follows without lag.
+- Follows one subject: a face (OpenCV's YuNet model at `~/video-pipeline/addons/models/face_detection_yunet_2023mar.onnx`,
+  which finds faces with sunglasses and helmets; OpenCV's built-in Haar detector if that file is missing), then a
+  person, then movement (never a camera pan). With two people it keeps the one it was following, never the gap
+  between them. Restarts at every hard cut; holds still while the subject stays within `--dead-zone` (12% of the
+  crop), then follows without lag.
 - Always make `--preview` (the source with the crop box drawn) and look at frames from it: check the box stays on
-  the speaker, especially in two-person shots, where it favours the biggest face.
+  the speaker, especially in two-person shots: it can't know who is talking, so it keeps the biggest face.
 - Use it on real footage (talking heads, screen-recorded presenters). For HyperFrames compositions, re-lay out the
   composition at 1080x1920 instead: cropping designed graphics cuts text off.
 

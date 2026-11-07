@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -42,15 +43,31 @@ class Sample:
 
 
 # ------------------------------------------------------------------ detection
+YUNET = Path(os.environ.get("VIDEO_PIPELINE", Path.home() / "video-pipeline")) / "addons" / "models" / \
+    "face_detection_yunet_2023mar.onnx"
+
+
 class Detector:
+    """Faces: OpenCV's YuNet model when its file is present (finds faces with sunglasses, helmets, turned heads),
+    else OpenCV's bundled Haar cascades. People: OpenCV's bundled HOG detector."""
+
     def __init__(self) -> None:
         base = cv2.data.haarcascades
         self.front = cv2.CascadeClassifier(base + "haarcascade_frontalface_default.xml")
         self.profile = cv2.CascadeClassifier(base + "haarcascade_profileface.xml")
         self.hog = cv2.HOGDescriptor()
         self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        self.yunet = None
+        if YUNET.exists():
+            self.yunet = cv2.FaceDetectorYN.create(str(YUNET), "", (320, 320), 0.6, 0.3, 5000)
 
-    def faces(self, gray: np.ndarray) -> list[tuple[int, int, int, int]]:
+    def faces(self, gray: np.ndarray, color: np.ndarray | None = None) -> list[tuple[int, int, int, int]]:
+        if self.yunet is not None and color is not None:
+            h, w = color.shape[:2]
+            self.yunet.setInputSize((w, h))
+            _, found = self.yunet.detect(color)
+            min_side = h / 25  # ignore tiny background faces
+            return [tuple(int(v) for v in f[:4]) for f in (found if found is not None else []) if f[3] >= min_side]
         h = gray.shape[0]
         min_size = (max(20, h // 14),) * 2
         found = list(self.front.detectMultiScale(gray, 1.1, 6, minSize=min_size))
@@ -65,23 +82,37 @@ class Detector:
         return [tuple(r) for r, wt in zip(rects, np.ravel(weights)) if wt > 0.5]
 
 
-def subject(det: Detector, gray: np.ndarray, prev: np.ndarray | None) -> tuple[float | None, float | None, str]:
-    """Subject centre in detection pixels. Several faces: weighted by size, so the main speaker wins."""
-    faces = det.faces(gray)
+def pick(boxes: list, last: tuple[float, float] | None, keep_ratio: float = 0.6) -> tuple[float, float]:
+    """One subject, never the average of several: two people far apart average to the empty wall between them.
+    Takes the biggest, but stays with the one followed so far while it is at least `keep_ratio` as big, so the
+    frame doesn't hop between two similar faces."""
+    centres = [(x + w / 2, y + h / 2, w * h) for x, y, w, h in boxes]
+    biggest = max(centres, key=lambda c: c[2])
+    if last is not None:
+        near = min(centres, key=lambda c: (c[0] - last[0]) ** 2 + (c[1] - last[1]) ** 2)
+        if near[2] >= keep_ratio * biggest[2]:
+            return near[0], near[1]
+    return biggest[0], biggest[1]
+
+
+def subject(det: Detector, gray: np.ndarray, prev: np.ndarray | None,
+            last: tuple[float, float] | None = None,
+            color: np.ndarray | None = None) -> tuple[float | None, float | None, str]:
+    """Subject centre in detection pixels: a face, else a person, else what moved."""
+    faces = det.faces(gray, color)
     if faces:
-        areas = np.array([w * h for _, _, w, h in faces], dtype=float)
-        weights = areas ** 2  # favour the biggest face strongly
-        cx = float(np.average([x + w / 2 for x, _, w, _ in faces], weights=weights))
-        cy = float(np.average([y + h / 2 for _, y, _, h in faces], weights=weights))
+        cx, cy = pick(faces, last)
         return cx, cy, "face"
     people = det.people(gray)
     if people:
-        x, y, w, h = max(people, key=lambda r: r[2] * r[3])
-        return x + w / 2, y + h / 4, "person"  # aim at the head end of a body
+        # aim at the head end of a body
+        cx, cy = pick([(x, y, w, h // 2) for x, y, w, h in people], last)
+        return cx, cy, "person"
     if prev is not None:
         diff = cv2.absdiff(cv2.GaussianBlur(gray, (9, 9), 0), cv2.GaussianBlur(prev, (9, 9), 0))
         mask = (diff > 18).astype(np.uint8)
-        if mask.mean() > 0.003:
+        # A camera pan changes most of the frame: that's not a subject moving, so don't chase it.
+        if 0.003 < mask.mean() < 0.2:
             m = cv2.moments(mask, binaryImage=True)
             return m["m10"] / m["m00"], m["m01"] / m["m00"], "motion"
     return None, None, "none"
@@ -96,6 +127,7 @@ def analyse(path: str, sample_fps: float = 5.0, cut_threshold: float = 0.55) -> 
     step = max(1, round(fps / sample_fps))
     scale = DETECT_WIDTH / src_w if src_w > DETECT_WIDTH else 1.0
     det, samples = Detector(), []
+    last: tuple[float, float] | None = None  # the subject followed so far in this shot
     prev_gray = prev_hist = None
     index = 0
     while True:
@@ -111,7 +143,11 @@ def analyse(path: str, sample_fps: float = 5.0, cut_threshold: float = 0.55) -> 
             hist = cv2.calcHist([cv2.cvtColor(small, cv2.COLOR_BGR2HSV)], [0, 1], None, [32, 32], [0, 180, 0, 256])
             cv2.normalize(hist, hist)
             cut = prev_hist is None or cv2.compareHist(prev_hist, hist, cv2.HISTCMP_CORREL) < cut_threshold
-            cx, cy, kind = subject(det, gray, None if cut else prev_gray)
+            if cut:
+                last = None
+            cx, cy, kind = subject(det, gray, None if cut else prev_gray, last, small)
+            if cx is not None and kind != "motion":
+                last = (cx, cy)
             samples.append(Sample(index / fps, cx / scale if cx is not None else None,
                                   cy / scale if cy is not None else None, kind, cut))
             prev_gray, prev_hist = gray, hist

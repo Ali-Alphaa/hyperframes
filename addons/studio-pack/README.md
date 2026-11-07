@@ -22,7 +22,16 @@ uv pip install --python ~/video-pipeline/.ai-venv/Scripts/python.exe numpy sound
 cp -r addons/studio-pack/skill ~/.claude/skills/studio-pack     # so Claude uses it
 ```
 
-FFmpeg must be on PATH. For smart reframe: `uv pip install --python ~/video-pipeline/.ai-venv/Scripts/python.exe "opencv-python-headless<5"`.
+FFmpeg must be on PATH. For smart reframe:
+
+```bash
+uv pip install --python ~/video-pipeline/.ai-venv/Scripts/python.exe "opencv-python-headless<5"
+# optional but much better face finding (sunglasses, helmets, turned heads): OpenCV's YuNet model, 230 KB
+curl -L -o ~/video-pipeline/addons/models/face_detection_yunet_2023mar.onnx   https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+```
+
+Tested on public-domain and CC-BY footage (credits in `footage/samples/CREDITS.md`): on an outdoor army interview,
+YuNet found faces in 138 of 201 looks, against 46 with the built-in detector.
 
 DeepFilterNet (better voice cleanup) runs from a clone of https://github.com/Rikorose/DeepFilterNet in its own
 environment, because it needs NumPy 1 and a ready-made `deepfilterlib`, which exists only up to Python 3.11:
