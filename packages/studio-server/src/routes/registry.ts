@@ -21,8 +21,9 @@ export function registerRegistryRoutes(api: Hono, adapter: StudioApiAdapter): vo
     }
     const body = await adapter.readRegistryLocalPoster?.(kind, name);
     if (!body) return c.json({ error: "Not found" }, 404);
+    const isJpeg = body[0] === 0xff && body[1] === 0xd8;
     return c.body(new Uint8Array(body), 200, {
-      "Content-Type": "image/png",
+      "Content-Type": isJpeg ? "image/jpeg" : "image/png",
       "Cache-Control": "public, max-age=86400",
     });
   });

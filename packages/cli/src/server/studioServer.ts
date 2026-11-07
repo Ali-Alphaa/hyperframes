@@ -107,12 +107,13 @@ function localCatalogPosterPath(kind: "block" | "component", name: string): stri
     }
   }
   if (!localCatalogImagesDir || !/^[a-z0-9][a-z0-9-]*$/.test(name)) return null;
-  const path = join(
-    localCatalogImagesDir,
-    kind === "component" ? "components" : "blocks",
-    `${name}.png`,
-  );
-  return existsSync(path) ? path : null;
+  const dir = join(localCatalogImagesDir, kind === "component" ? "components" : "blocks");
+  // Prefer the small JPEG the fork script makes; fall back to the full-size PNG.
+  for (const ext of [".jpg", ".png"]) {
+    const path = join(dir, `${name}${ext}`);
+    if (existsSync(path)) return path;
+  }
+  return null;
 }
 
 // Under preview.ts's 3s process-exit watchdog, so shutdown() always returns
