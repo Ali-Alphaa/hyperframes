@@ -41,7 +41,12 @@ Chrome or Edge, and it runs the built files, so run `bun run build` after any co
 
 The window opens in your normal browser profile. A separate, fresh profile played the preview without sound on this PC.
 To pick a project it shows the standard Windows Explorer Open window: go into the project folder and open its
-`index.html`.
+`index.html`. `install-shortcut.ps1 -Project <folder> -Name <name>` makes a shortcut that opens one project directly.
+
+When its window closes, the launcher stops only the server it started. (`preview --stop` stops every Studio for the
+project, so it used to kill the server behind another open window.) Only one Studio runs per project: opening the
+project again replaces the earlier server. Shortcuts start the launcher through `conhost --headless`, because Windows
+Terminal shows a window for it that kills the launcher when closed.
 
 ## Faster Play
 

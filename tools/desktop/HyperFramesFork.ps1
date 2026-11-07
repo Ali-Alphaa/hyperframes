@@ -109,11 +109,23 @@ if (-not (Test-Project $Project)) {
 }
 Set-Content -LiteralPath $lastFile -Value $Project
 
+# Stops only the server this launcher started. `preview --stop` stops every Studio for the project, so
+# closing one window used to kill the server behind another window of the same project.
+$serverPid = $null
+function Stop-OwnServer {
+    if (-not $serverPid) { return }
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$serverPid" -ErrorAction SilentlyContinue
+    if ($proc -and $proc.CommandLine -match 'preview') {
+        & taskkill.exe /PID $serverPid /T /F 2>&1 | Out-Null
+    }
+}
+
 Push-Location $Project
 try {
     $output = & node $cli preview --background --no-open --json --force-new 2>&1 | Out-String
     $json = $output.Substring($output.IndexOf('{')) | ConvertFrom-Json
     if (-not $json.ok) { Fail "The Studio didn't start:`n$output" }
+    $serverPid = $json.result.pid
     $url = "http://$($json.result.host):$($json.result.port)/"
 
     # Open an app window in the browser's normal profile. A separate, fresh profile played Studio's
@@ -133,6 +145,6 @@ try {
 } catch {
     Fail "The Studio didn't start:`n$_"
 } finally {
-    & node $cli preview --stop 2>&1 | Out-Null
+    Stop-OwnServer
     Pop-Location
 }
