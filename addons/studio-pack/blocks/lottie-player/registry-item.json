@@ -1,0 +1,80 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "lottie-player",
+  "type": "hyperframes:block",
+  "title": "Lottie Player",
+  "description": "Plays any Lottie animation (a .json from LottieFiles or After Effects' Bodymovin) once, looping or ping-ponging, at any size and speed, on a transparent background. Comes with a sample tick animation. The animation is built into the installed block, so nothing is fetched while rendering.",
+  "tags": ["lottie", "icon", "animation", "after-effects", "loop", "studio-pack"],
+  "license": "Apache-2.0",
+  "needs": ["lottie"],
+  "dimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "duration": 6,
+  "variables": [
+    {
+      "id": "size",
+      "type": "number",
+      "label": "Size",
+      "default": 420,
+      "min": 60,
+      "max": 1080,
+      "unit": "px"
+    },
+    {
+      "id": "x",
+      "type": "number",
+      "label": "Centre X",
+      "default": 960,
+      "min": 0,
+      "max": 1920,
+      "unit": "px"
+    },
+    {
+      "id": "y",
+      "type": "number",
+      "label": "Centre Y",
+      "default": 540,
+      "min": 0,
+      "max": 1080,
+      "unit": "px"
+    },
+    {
+      "id": "speed",
+      "type": "number",
+      "label": "Speed",
+      "default": 1,
+      "min": 0.25,
+      "max": 4,
+      "step": 0.25
+    },
+    {
+      "id": "mode",
+      "type": "enum",
+      "label": "When it reaches the end",
+      "default": "hold",
+      "options": [
+        {
+          "value": "hold",
+          "label": "Hold the last frame"
+        },
+        {
+          "value": "loop",
+          "label": "Loop"
+        },
+        {
+          "value": "pingpong",
+          "label": "Ping-pong"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "lottie-player.html",
+      "target": "compositions/lottie-player.html",
+      "type": "hyperframes:composition"
+    }
+  ]
+}

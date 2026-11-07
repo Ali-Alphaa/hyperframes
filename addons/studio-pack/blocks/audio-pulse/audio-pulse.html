@@ -1,0 +1,93 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"color","type":"color","label":"Glow colour","default":"#2EBD85"},{"id":"logo","type":"string","label":"Logo image (project path, optional)","default":""},{"id":"size","type":"number","label":"Size","default":320,"min":120,"max":800,"unit":"px"},{"id":"amount","type":"number","label":"How much it reacts","default":0.35,"min":0.05,"max":1,"step":0.05}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>__ID__</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      #__ID__-root { position: absolute; inset: 0; overflow: hidden; }
+      #__ID__-stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+      #__ID__-disc {
+        position: relative; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffff 0%, var(--c) 45%, color-mix(in srgb, var(--c) 55%, #000) 100%);
+        display: flex; align-items: center; justify-content: center; overflow: hidden;
+      }
+      #__ID__-disc img { width: 70%; height: 70%; object-fit: contain; }
+      .__ID__-ring {
+        position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 4px solid var(--c);
+        transform: translate(-50%, -50%) scale(1); opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="__ID__-root" data-composition-id="__ID__" data-start="0" data-duration="__DURATION__" data-width="1920" data-height="1080">
+      <div id="__ID__-stage"><div id="__ID__-disc"></div></div>
+    </div>
+    <script type="application/json" id="__ID__-envelope">__DATA__</script>
+    <script>
+      (function () {
+        var vars =
+          window.__hyperframes && typeof window.__hyperframes.getVariables === "function"
+            ? window.__hyperframes.getVariables()
+            : {};
+        var env = JSON.parse(document.getElementById("__ID__-envelope").textContent);
+        var offset = __OFFSET__;
+        var duration = __DURATION__;
+        var size = Number(vars.size) || 320;
+        var amount = Number(vars.amount) || 0.35;
+        var color = vars.color || "#2EBD85";
+        var stage = document.getElementById("__ID__-stage");
+        var disc = document.getElementById("__ID__-disc");
+        stage.style.setProperty("--c", color);
+        disc.style.width = disc.style.height = size + "px";
+        if (vars.logo) {
+          var img = document.createElement("img");
+          var assetUrl = window.__hyperframes && __hyperframes.assetUrl ? __hyperframes.assetUrl : function (p) { return p; };
+          img.src = assetUrl("../" + vars.logo);
+          disc.appendChild(img);
+        }
+        // Three rings, each released on a loud moment; their timing comes from the levels, not a clock.
+        var rings = [];
+        for (var i = 0; i < 3; i++) {
+          var ring = document.createElement("div");
+          ring.className = "__ID__-ring";
+          ring.style.width = ring.style.height = size + "px";
+          stage.appendChild(ring);
+          rings.push(ring);
+        }
+        var level = env.level;
+        var peaks = [];
+        for (var f = 2; f < level.length - 2; f++) {
+          if (level[f] > 0.72 && level[f] >= level[f - 1] && level[f] > level[f + 1] && (!peaks.length || f - peaks[peaks.length - 1] > env.fps * 0.4)) peaks.push(f);
+        }
+        var clock = { t: 0 };
+        function draw() {
+          var frame = Math.max(0, Math.min(level.length - 1, Math.round((clock.t + offset) * env.fps)));
+          var v = level[frame];
+          disc.style.transform = "scale(" + (1 + amount * v) + ")";
+          disc.style.boxShadow = "0 0 " + (20 + 120 * v) + "px " + (4 + 30 * v) + "px color-mix(in srgb, " + color + " " + Math.round(25 + 55 * v) + "%, transparent)";
+          // the three most recent peaks drive the rings: each grows and fades over 1.2 s
+          var shown = 0;
+          for (var p = peaks.length - 1; p >= 0 && shown < 3; p--) {
+            var age = (frame - peaks[p]) / env.fps;
+            if (age < 0) continue;
+            if (age > 1.2) break;
+            var r = rings[shown++];
+            r.style.opacity = String(0.8 * (1 - age / 1.2));
+            r.style.transform = "translate(-50%, -50%) scale(" + (1 + age * 0.9) + ")";
+          }
+          for (; shown < 3; shown++) rings[shown].style.opacity = "0";
+        }
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(clock, { t: 0 }, { t: duration, duration: duration, ease: "none", onUpdate: draw }, 0);
+        tl.fromTo(stage, { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.6)" }, 0);
+        draw();
+        window.__timelines = window.__timelines || {};
+        window.__timelines["__ID__"] = tl;
+      })();
+    </script>
+  </body>
+</html>

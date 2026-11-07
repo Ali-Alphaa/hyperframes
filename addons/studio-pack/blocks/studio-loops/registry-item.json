@@ -1,0 +1,17 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "studio-loops",
+  "type": "hyperframes:component",
+  "title": "Loop and ping-pong motion",
+  "description": "A small helper that adds looping or ping-pong (there and back) motion to a GSAP timeline for exactly as long as a clip lasts, like Resolve 21's loop and ping-pong keyframe modes. Finite repeats, so the timeline length stays right.",
+  "tags": ["loop", "ping-pong", "yoyo", "easing", "keyframes", "studio-pack"],
+  "license": "Apache-2.0",
+  "usage": "<script src=\"compositions/lib/studio-loops.js\"></script>  then  StudioLoops.add(tl, \"#badge\", { y: 0 }, { y: -20 }, { start: 1, end: 9, cycle: 1.2, mode: \"pingpong\", ease: \"sine.inOut\" });",
+  "files": [
+    {
+      "path": "studio-loops.js",
+      "target": "compositions/lib/studio-loops.js",
+      "type": "hyperframes:asset"
+    }
+  ]
+}

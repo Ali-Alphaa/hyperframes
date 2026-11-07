@@ -3,7 +3,7 @@ name: studio-pack
 description: Fork add-on with DaVinci Resolve-style finishing tools for HyperFrames projects. Use for voice cleanup (noise, hum, echo), dialogue leveling, beat detection when `hyperframes beats` finds none, snapping cuts to beats, auto-ducking music under voice clips, and exporting one render to YouTube, Shorts, TikTok, Reels and X specs. Use before publishing any video.
 ---
 
-# Studio Pack (batches 1-3: audio, platform export, smart reframe, footage fixes, colour)
+# Studio Pack (batches 1-4: audio, export, reframe, footage fixes, colour, motion blocks)
 
 Tools live in the fork at `addons/studio-pack/tools/`. Run them with the shared environment:
 
@@ -104,6 +104,33 @@ $PY $PACK/studio_color.py lut clip.mp4 look.mp4 --cube film.cube --amount 0.6
   within limits. match moves a clip onto a reference clip's colour. Both print Lab numbers before and after:
   report them. Run per shot: a clip with very different shots gets one average correction.
 - The saved `.cube` works in Resolve and other editors too.
+
+## Motion blocks (installed into a project, then mounted in index.html)
+
+```bash
+$PY $PACK/studio_motion.py list
+$PY $PACK/studio_motion.py add audio-bars --project . --audio assets/music/bed.wav --as music-bars
+$PY $PACK/studio_motion.py add audio-pulse --project . --audio assets/vo/line.wav --as voice-pulse --offset 0
+$PY $PACK/studio_motion.py add picture-in-picture --project . --src assets/clips/cam.mp4 --as cam
+$PY $PACK/studio_motion.py add lottie-player --project . --lottie assets/icon.json --as icon --loop --duration 6
+$PY $PACK/studio_motion.py add studio-loops --project .
+```
+
+- `add` writes `compositions/<id>.html` and prints the mount `<div>` to paste inside the root. Set its
+  `data-start` (and `data-duration`), its `data-track-index`, and options with `data-variable-values='{...}'`
+  (each block's variables are in its `blocks/<name>/registry-item.json`). Use `--as` to add a block twice.
+- Reactive blocks (`audio-bars`, `audio-pulse`) carry the audio's measured levels inside them, so renders match
+  the preview. They are tied to the audio's timing: mount them at the same `data-start` as the audio element,
+  or pass `--offset` = seconds into the audio where the block starts. Re-run `add` if the audio changes.
+- `picture-in-picture` is muted (webcam/screen recordings usually have separate sound); remove `muted` and add
+  `data-has-audio="true"` in the installed file to keep its sound.
+- `lottie-player` builds the Lottie JSON in (no fetch at render). Modes: hold, loop, ping-pong (variable `mode`).
+- Loop and ping-pong motion on anything (Resolve 21's loop/ping-pong keyframe modes): load
+  `compositions/lib/studio-loops.js` in the root `<head>`, then
+  `StudioLoops.add(tl, "#el", fromVars, toVars, { start, end, cycle, mode: "loop"|"pingpong"|"relative", ease })`.
+  Never use `repeat: -1` in a HyperFrames timeline: it makes the timeline endless; this adds finite repeats.
+- These blocks don't appear in Studio's Catalog tab (that needs changes to HyperFrames' code); Claude installs them.
+- After mounting: `npx hyperframes check`, then snapshot the frames where the blocks are on screen.
 
 ## Export for platforms (after the final render)
 

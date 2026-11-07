@@ -1,0 +1,60 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"corner","type":"enum","label":"Corner","default":"bottom-right","options":[{"value":"bottom-right","label":"Bottom right"},{"value":"bottom-left","label":"Bottom left"},{"value":"top-right","label":"Top right"},{"value":"top-left","label":"Top left"}]},{"id":"shape","type":"enum","label":"Shape","default":"rounded","options":[{"value":"rounded","label":"Rounded rectangle"},{"value":"circle","label":"Circle"}]},{"id":"size","type":"number","label":"Width","default":34,"min":15,"max":60,"unit":"% of frame"},{"id":"border","type":"color","label":"Border colour","default":"#FFFFFF"},{"id":"margin","type":"number","label":"Distance from edge","default":48,"min":0,"max":200,"unit":"px"}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>__ID__</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      #__ID__-root { position: absolute; inset: 0; overflow: hidden; }
+      #__ID__-frame {
+        position: absolute; overflow: hidden; border: 6px solid var(--border, #fff);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.3);
+        background: #000;
+      }
+      #__ID__-frame video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="__ID__-root" data-composition-id="__ID__" data-start="0" data-duration="__DURATION__" data-width="1920" data-height="1080">
+      <div id="__ID__-frame">
+        <!-- Muted: a webcam or screen recording usually has its own sound track. To keep this clip's sound,
+             remove `muted` and add data-has-audio="true". -->
+        <video id="__ID__-video" class="clip" data-start="0" data-duration="__DURATION__" src="__SRC__" muted playsinline></video>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var vars =
+          window.__hyperframes && typeof window.__hyperframes.getVariables === "function"
+            ? window.__hyperframes.getVariables()
+            : {};
+        var duration = __DURATION__;
+        var corner = vars.corner || "bottom-right";
+        var circle = vars.shape === "circle";
+        var margin = Number(vars.margin);
+        if (!isFinite(margin)) margin = 48;
+        var w = Math.round(1920 * (Number(vars.size) || 34) / 100);
+        var h = circle ? w : Math.round(w * 9 / 16);
+        var frame = document.getElementById("__ID__-frame");
+        frame.style.width = w + "px";
+        frame.style.height = h + "px";
+        frame.style.borderRadius = circle ? "50%" : "22px";
+        frame.style.setProperty("--border", vars.border || "#FFFFFF");
+        var right = corner.indexOf("right") >= 0;
+        var bottom = corner.indexOf("bottom") >= 0;
+        frame.style[right ? "right" : "left"] = margin + "px";
+        frame.style[bottom ? "bottom" : "top"] = margin + "px";
+        var fromX = right ? 80 : -80;
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(frame, { opacity: 0, x: fromX, scale: 0.9 }, { opacity: 1, x: 0, scale: 1, duration: 0.6, ease: "power3.out" }, 0);
+        tl.to(frame, { opacity: 0, x: fromX, scale: 0.9, duration: 0.45, ease: "power2.in" }, Math.max(0.6, duration - 0.45));
+        window.__timelines = window.__timelines || {};
+        window.__timelines["__ID__"] = tl;
+      })();
+    </script>
+  </body>
+</html>

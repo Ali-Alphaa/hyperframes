@@ -1,0 +1,62 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"size","type":"number","label":"Size","default":420,"min":60,"max":1080,"unit":"px"},{"id":"x","type":"number","label":"Centre X","default":960,"min":0,"max":1920,"unit":"px"},{"id":"y","type":"number","label":"Centre Y","default":540,"min":0,"max":1080,"unit":"px"},{"id":"speed","type":"number","label":"Speed","default":1,"min":0.25,"max":4,"step":0.25},{"id":"mode","type":"enum","label":"When it reaches the end","default":"hold","options":[{"value":"hold","label":"Hold the last frame"},{"value":"loop","label":"Loop"},{"value":"pingpong","label":"Ping-pong"}]}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>__ID__</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie_svg.min.js"></script>
+    <style>
+      #__ID__-root { position: absolute; inset: 0; overflow: hidden; }
+      #__ID__-anim { position: absolute; transform: translate(-50%, -50%); }
+    </style>
+  </head>
+  <body>
+    <div id="__ID__-root" data-composition-id="__ID__" data-start="0" data-duration="__DURATION__" data-width="1920" data-height="1080">
+      <div id="__ID__-anim"></div>
+    </div>
+    <!-- The Lottie animation, built in at install so nothing is fetched while rendering. -->
+    <script type="application/json" id="__ID__-lottie">__DATA__</script>
+    <script>
+      (function () {
+        var vars =
+          window.__hyperframes && typeof window.__hyperframes.getVariables === "function"
+            ? window.__hyperframes.getVariables()
+            : {};
+        var data = JSON.parse(document.getElementById("__ID__-lottie").textContent);
+        var duration = __DURATION__;
+        var size = Number(vars.size) || 420;
+        var speed = Number(vars.speed) || 1;
+        var mode = vars.mode || (__LOOP__ ? "loop" : "hold");
+        var box = document.getElementById("__ID__-anim");
+        box.style.width = size + "px";
+        box.style.height = Math.round(size * data.h / data.w) + "px";
+        box.style.left = (isFinite(Number(vars.x)) ? Number(vars.x) : 960) + "px";
+        box.style.top = (isFinite(Number(vars.y)) ? Number(vars.y) : 540) + "px";
+        var anim = lottie.loadAnimation({ container: box, renderer: "svg", loop: false, autoplay: false, animationData: data });
+        var frames = data.op - data.ip;
+        var clock = { t: 0 };
+        // This block seeks its own player from the timeline (not via window.__hfLottie), because the runtime only
+        // plays a Lottie once; looping and ping-pong are worked out here, from timeline time, so renders match.
+        function draw() {
+          var f = clock.t * speed * data.fr;
+          if (mode === "loop") f = f % frames;
+          else if (mode === "pingpong") {
+            var c = f % (2 * frames);
+            f = c < frames ? c : 2 * frames - c;
+          } else f = Math.min(f, frames - 0.001);
+          anim.goToAndStop(data.ip + f, true);
+        }
+        var tl = gsap.timeline({ paused: true });
+        tl.fromTo(clock, { t: 0 }, { t: duration, duration: duration, ease: "none", onUpdate: draw }, 0);
+        if (anim.isLoaded) draw();
+        else anim.addEventListener("DOMLoaded", draw);
+        window.__timelines = window.__timelines || {};
+        window.__timelines["__ID__"] = tl;
+      })();
+    </script>
+  </body>
+</html>

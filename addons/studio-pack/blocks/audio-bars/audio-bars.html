@@ -1,0 +1,78 @@
+<!doctype html>
+<html
+  lang="en"
+  data-composition-variables='[{"id":"color","type":"color","label":"Bar colour","default":"#5B8CFF"},{"id":"accent","type":"color","label":"Peak colour","default":"#FF5BD7"},{"id":"place","type":"enum","label":"Position","default":"bottom","options":[{"value":"bottom","label":"Bottom"},{"value":"center","label":"Centre (mirrored)"}]},{"id":"height","type":"number","label":"Height","default":280,"min":80,"max":700,"unit":"px"},{"id":"width","type":"number","label":"Width","default":1200,"min":300,"max":1800,"unit":"px"}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>__ID__</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      #__ID__-root { position: absolute; inset: 0; overflow: hidden; }
+      #__ID__-bars {
+        position: absolute; left: 50%; display: flex; align-items: flex-end; gap: 10px;
+        transform: translateX(-50%);
+      }
+      #__ID__-bars.center { align-items: center; }
+      #__ID__-bars .bar {
+        flex: 1; height: 100%; border-radius: 8px; transform-origin: 50% 100%;
+        background: linear-gradient(to top, var(--bar), var(--peak));
+        box-shadow: 0 0 24px color-mix(in srgb, var(--peak) 45%, transparent);
+      }
+      #__ID__-bars.center .bar { transform-origin: 50% 50%; background: linear-gradient(to top, var(--peak), var(--bar) 50%, var(--peak)); }
+    </style>
+  </head>
+  <body>
+    <div id="__ID__-root" data-composition-id="__ID__" data-start="0" data-duration="__DURATION__" data-width="1920" data-height="1080">
+      <div id="__ID__-bars"></div>
+    </div>
+    <!-- Measured by studio_motion.py from the audio at install time: levels per frame, 0-1. -->
+    <script type="application/json" id="__ID__-envelope">__DATA__</script>
+    <script>
+      (function () {
+        var vars =
+          window.__hyperframes && typeof window.__hyperframes.getVariables === "function"
+            ? window.__hyperframes.getVariables()
+            : {};
+        var env = JSON.parse(document.getElementById("__ID__-envelope").textContent);
+        var offset = __OFFSET__;
+        var duration = __DURATION__;
+        var box = document.getElementById("__ID__-bars");
+        var place = vars.place || "bottom";
+        var height = Number(vars.height) || 280;
+        box.style.width = (Number(vars.width) || 1200) + "px";
+        box.style.height = height + "px";
+        box.style.setProperty("--bar", vars.color || "#5B8CFF");
+        box.style.setProperty("--peak", vars.accent || "#FF5BD7");
+        if (place === "center") {
+          box.classList.add("center");
+          box.style.top = 540 - height / 2 + "px";
+        } else {
+          box.style.bottom = "90px";
+        }
+        var count = env.bands[0].length;
+        var bars = [];
+        for (var i = 0; i < count; i++) {
+          var bar = document.createElement("div");
+          bar.className = "bar";
+          box.appendChild(bar);
+          bars.push(bar);
+        }
+        var clock = { t: 0 };
+        function draw() {
+          var frame = Math.round((clock.t + offset) * env.fps);
+          var row = env.bands[Math.max(0, Math.min(env.bands.length - 1, frame))];
+          for (var k = 0; k < count; k++) bars[k].style.transform = "scaleY(" + (0.04 + 0.96 * row[k]) + ")";
+        }
+        var tl = gsap.timeline({ paused: true });
+        // The bars are drawn from the timeline's own time, so a seek, a scrub and a render all agree.
+        tl.fromTo(clock, { t: 0 }, { t: duration, duration: duration, ease: "none", onUpdate: draw }, 0);
+        tl.fromTo(box, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0);
+        draw();
+        window.__timelines = window.__timelines || {};
+        window.__timelines["__ID__"] = tl;
+      })();
+    </script>
+  </body>
+</html>

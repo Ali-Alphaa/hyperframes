@@ -1,0 +1,51 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "audio-bars",
+  "type": "hyperframes:block",
+  "title": "Audio Bars",
+  "description": "Equaliser bars that move with the music or voice, bass on the left. Transparent background, for laying over a scene. Driven by audio measured at install, so renders match the preview.",
+  "tags": ["audio", "audio-reactive", "music", "visualizer", "equalizer", "studio-pack"],
+  "license": "Apache-2.0",
+  "needs": ["audio"],
+  "dimensions": { "width": 1920, "height": 1080 },
+  "duration": 10,
+  "variables": [
+    { "id": "color", "type": "color", "label": "Bar colour", "default": "#5B8CFF" },
+    { "id": "accent", "type": "color", "label": "Peak colour", "default": "#FF5BD7" },
+    {
+      "id": "place",
+      "type": "enum",
+      "label": "Position",
+      "default": "bottom",
+      "options": [
+        { "value": "bottom", "label": "Bottom" },
+        { "value": "center", "label": "Centre (mirrored)" }
+      ]
+    },
+    {
+      "id": "height",
+      "type": "number",
+      "label": "Height",
+      "default": 280,
+      "min": 80,
+      "max": 700,
+      "unit": "px"
+    },
+    {
+      "id": "width",
+      "type": "number",
+      "label": "Width",
+      "default": 1200,
+      "min": 300,
+      "max": 1800,
+      "unit": "px"
+    }
+  ],
+  "files": [
+    {
+      "path": "audio-bars.html",
+      "target": "compositions/audio-bars.html",
+      "type": "hyperframes:composition"
+    }
+  ]
+}

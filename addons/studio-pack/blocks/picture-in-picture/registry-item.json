@@ -1,0 +1,70 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "picture-in-picture",
+  "type": "hyperframes:block",
+  "title": "Picture in Picture",
+  "description": "A video (webcam, screen recording, B-roll) in a floating rounded or circular frame with a soft shadow, sliding in from its corner and out at the end. Transparent background, for laying over a scene.",
+  "tags": [
+    "picture-in-picture",
+    "pip",
+    "webcam",
+    "screen-recording",
+    "overlay",
+    "frame",
+    "studio-pack"
+  ],
+  "license": "Apache-2.0",
+  "needs": ["src"],
+  "dimensions": { "width": 1920, "height": 1080 },
+  "duration": 8,
+  "variables": [
+    {
+      "id": "corner",
+      "type": "enum",
+      "label": "Corner",
+      "default": "bottom-right",
+      "options": [
+        { "value": "bottom-right", "label": "Bottom right" },
+        { "value": "bottom-left", "label": "Bottom left" },
+        { "value": "top-right", "label": "Top right" },
+        { "value": "top-left", "label": "Top left" }
+      ]
+    },
+    {
+      "id": "shape",
+      "type": "enum",
+      "label": "Shape",
+      "default": "rounded",
+      "options": [
+        { "value": "rounded", "label": "Rounded rectangle" },
+        { "value": "circle", "label": "Circle" }
+      ]
+    },
+    {
+      "id": "size",
+      "type": "number",
+      "label": "Width",
+      "default": 34,
+      "min": 15,
+      "max": 60,
+      "unit": "% of frame"
+    },
+    { "id": "border", "type": "color", "label": "Border colour", "default": "#FFFFFF" },
+    {
+      "id": "margin",
+      "type": "number",
+      "label": "Distance from edge",
+      "default": 48,
+      "min": 0,
+      "max": 200,
+      "unit": "px"
+    }
+  ],
+  "files": [
+    {
+      "path": "picture-in-picture.html",
+      "target": "compositions/picture-in-picture.html",
+      "type": "hyperframes:composition"
+    }
+  ]
+}
