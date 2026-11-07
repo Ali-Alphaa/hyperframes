@@ -17,6 +17,28 @@ function Fail($message) {
     exit 1
 }
 
+Add-Type -Namespace HfFork -Name Win -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr lParam);
+[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder s, int n);
+[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+[DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
+public delegate bool EnumProc(IntPtr h, IntPtr lParam);
+public static long[] WindowsTitled(string title) {
+    var found = new System.Collections.Generic.List<long>();
+    EnumWindows((h, l) => {
+        if (!IsWindowVisible(h)) return true;
+        var sb = new System.Text.StringBuilder(512);
+        GetWindowText(h, sb, 512);
+        if (sb.ToString() == title) found.Add(h.ToInt64());
+        return true;
+    }, IntPtr.Zero);
+    return found.ToArray();
+}
+'@
+
+# Handles of the Studio app windows open right now.
+function Get-StudioWindows { return @([HfFork.Win]::WindowsTitled('HyperFrames Studio')) }
+
 function Find-Browser {
     $candidates = @(
         "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
@@ -143,11 +165,20 @@ try {
     if (-not $json.ok) { Fail "The Studio didn't start:`n$output" }
     $url = "http://$($json.result.host):$($json.result.port)/"
 
-    # A separate browser profile makes this a real window of its own, and lets us know when it closes.
-    $profile = Join-Path $dataDir 'window'
-    Start-Process -FilePath $browser -Wait -ArgumentList @(
-        "--app=$url", "--user-data-dir=`"$profile`"", '--window-size=1500,950', '--no-first-run', '--no-default-browser-check'
-    )
+    # Open an app window in the browser's normal profile. A separate, fresh profile played Studio's
+    # preview without sound on this PC, while the normal profile plays it with sound.
+    $before = Get-StudioWindows
+    Start-Process -FilePath $browser -ArgumentList @("--new-window", "--app=$url", '--window-size=1500,950')
+
+    # The browser hands the window to its running process, so wait for the window itself: the new
+    # window titled exactly like the page (normal tabs end in "- Google Chrome"), then until it closes.
+    $mine = $null
+    for ($i = 0; $i -lt 120 -and -not $mine; $i++) {
+        Start-Sleep -Milliseconds 500
+        $mine = Get-StudioWindows | Where-Object { $before -notcontains $_ } | Select-Object -First 1
+    }
+    if (-not $mine) { Fail "The Studio window didn't open." }
+    while ([HfFork.Win]::IsWindow([IntPtr]$mine)) { Start-Sleep -Seconds 2 }
 } catch {
     Fail "The Studio didn't start:`n$_"
 } finally {

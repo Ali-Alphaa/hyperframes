@@ -39,6 +39,8 @@ keep using the official `hyperframes` package from npm until they are pointed at
 window closes. `tools/desktop/install-shortcut.ps1` puts a "HyperFrames Fork" shortcut on the Windows desktop. It needs
 Chrome or Edge, and it runs the built files, so run `bun run build` after any code change or merge.
 
+The window opens in your normal browser profile. A separate, fresh profile played the preview without sound on this PC.
+
 The official HyperFrames desktop app isn't in this repository, so this is not that app. It has no Framey chat or Pro
 features, and Studio's "Install the desktop app" button leads to the official one.
 
