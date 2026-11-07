@@ -47,6 +47,18 @@ uv pip install --python .df-venv/Scripts/python.exe --no-deps -e addons/DeepFilt
 
 Building the repo's Rust `deep-filter` program also works, but needs Visual Studio's C++ build tools.
 
+Batch 3's GPU tools (they run through Vulkan, so they don't need PyTorch):
+
+```bash
+uv pip install --python ~/video-pipeline/.ai-venv/Scripts/python.exe realesrgan-ncnn-py rife-ncnn-vulkan-python-tntwise "opencv-python>=4.8,<5"
+# RIFE ships without models: fetch rife-v4.6 (flownet.param, flownet.bin) from
+# https://github.com/TNTwise/rife-ncnn-vulkan/tree/master/models/rife-v4.6 into
+# ~/video-pipeline/.ai-venv/Lib/site-packages/rife_ncnn_vulkan_python/models/rife-v4.6/
+```
+
+Keep OpenCV below 5 (Real-ESRGAN's package pulls in the newest, and OpenCV 5 dropped the face detector reframe
+falls back on).
+
 ## Tests
 
 ```bash

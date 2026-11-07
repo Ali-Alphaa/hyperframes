@@ -3,7 +3,7 @@ name: studio-pack
 description: Fork add-on with DaVinci Resolve-style finishing tools for HyperFrames projects. Use for voice cleanup (noise, hum, echo), dialogue leveling, beat detection when `hyperframes beats` finds none, snapping cuts to beats, auto-ducking music under voice clips, and exporting one render to YouTube, Shorts, TikTok, Reels and X specs. Use before publishing any video.
 ---
 
-# Studio Pack (batches 1-2: audio, platform export, smart reframe)
+# Studio Pack (batches 1-3: audio, platform export, smart reframe, footage fixes, colour)
 
 Tools live in the fork at `addons/studio-pack/tools/`. Run them with the shared environment:
 
@@ -70,6 +70,40 @@ $PY $PACK/studio_reframe.py talk.mp4 talk.square.mp4 --aspect 1:1          # 9:1
   the speaker, especially in two-person shots: it can't know who is talking, so it keeps the biggest face.
 - Use it on real footage (talking heads, screen-recorded presenters). For HyperFrames compositions, re-lay out the
   composition at 1080x1920 instead: cropping designed graphics cuts text off.
+
+## Footage fixes (camera footage and screen recordings, before they go into a project)
+
+```bash
+$PY $PACK/studio_footage.py stabilise shaky.mp4 steady.mp4            # --strength light|medium|strong
+$PY $PACK/studio_footage.py denoise grainy.mp4 clean.mp4              # --strength light|medium|strong
+$PY $PACK/studio_footage.py slowmo clip.mp4 slow.mp4 --factor 4       # 4x slower, sound dropped
+$PY $PACK/studio_footage.py slowmo clip.mp4 smooth.mp4 --factor 2 --mode smooth   # 2x frame rate, sound kept
+$PY $PACK/studio_footage.py upscale small.mp4 big.mp4 --scale 2       # --model photo (camera) | fast (screens, graphics)
+```
+
+- Stabilise zooms in to hide moving edges (about 25% on strong shake): tell the user, and frame titles with that
+  margin. It doesn't fix motion blur.
+- Denoise averages matching pixels across neighbouring frames: medium is right for most footage; check a frame
+  with fast motion for trails.
+- Slow motion uses RIFE on the GPU (FFmpeg minterpolate if RIFE is missing). It invents frames: check fast,
+  overlapping motion (hands, spinning objects) for warping.
+- Upscale "photo" (Real-ESRGAN x4plus) is sharpest but slow (~1 s per 480x270 frame) and can make skin look
+  plastic; "fast" suits screen recordings and graphics. It can't recover detail that isn't there. Topaz Video AI
+  (paid) runs with `--engine topaz` only if the user has installed it.
+- GPU tools exit through TerminateProcess on Windows (their Vulkan teardown crashes); outputs are complete.
+
+## Colour for footage files
+
+```bash
+$PY $PACK/studio_color.py autocorrect clip.mp4 fixed.mp4 --save-lut fixed.cube
+$PY $PACK/studio_color.py match b-cam.mp4 a-cam.mp4 b-matched.mp4 --save-lut b-to-a.cube
+$PY $PACK/studio_color.py lut clip.mp4 look.mp4 --cube film.cube --amount 0.6
+```
+
+- autocorrect neutralises a colour cast but keeps 30% of the scene's own colour, and nudges exposure/contrast
+  within limits. match moves a clip onto a reference clip's colour. Both print Lab numbers before and after:
+  report them. Run per shot: a clip with very different shots gets one average correction.
+- The saved `.cube` works in Resolve and other editors too.
 
 ## Export for platforms (after the final render)
 
