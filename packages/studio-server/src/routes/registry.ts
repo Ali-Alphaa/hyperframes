@@ -12,6 +12,21 @@ export function registerRegistryRoutes(api: Hono, adapter: StudioApiAdapter): vo
     return c.json(items);
   });
 
+  // Fork: thumbnails made by scripts/generate-catalog-previews.ts for items with no hosted poster.
+  api.get("/registry/local-poster/:kind/:name", async (c) => {
+    const kind = c.req.param("kind");
+    const name = c.req.param("name");
+    if ((kind !== "block" && kind !== "component") || !/^[a-z0-9][a-z0-9-]*$/.test(name)) {
+      return c.json({ error: "Not found" }, 404);
+    }
+    const body = await adapter.readRegistryLocalPoster?.(kind, name);
+    if (!body) return c.json({ error: "Not found" }, 404);
+    return c.body(new Uint8Array(body), 200, {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=86400",
+    });
+  });
+
   // fallow-ignore-next-line complexity
   api.post("/projects/:id/registry/install", async (c) => {
     if (!adapter.installRegistryBlock) {

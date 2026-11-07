@@ -42,6 +42,13 @@ Chrome or Edge, and it runs the built files, so run `bun run build` after any co
 The official HyperFrames desktop app isn't in this repository, so this is not that app. It has no Framey chat or Pro
 features, and Studio's "Install the desktop app" button leads to the official one.
 
+## Catalog thumbnails
+
+HeyGen hosts preview images for only some catalog items, and Studio shows a plain category tile for the rest. This fork
+renders the missing ones on your computer: run `node scripts/fork-catalog-thumbnails.mjs` after `bun run build`. It writes
+PNGs to `docs/images/catalog/` (not committed), and Studio serves them through `/api/registry/local-poster/...` for
+items with no hosted preview. Run it again after merging upstream, because new catalog items arrive without images.
+
 ## Shorts Generator
 
 `tools/shorts-generator` cuts long videos into vertical clips. See its `README.md`.

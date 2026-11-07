@@ -90,6 +90,31 @@ import { loadSharpInBackground } from "../utils/optionalPackages.js";
 
 const STUDIO_MANUAL_EDITS_PATH = ".hyperframes/studio-manual-edits.json";
 
+// Fork: catalog thumbnails generated locally into the checkout's docs/images/catalog. Found by
+// walking up from this file, so it works from source and from the built dist; an npm install has none.
+let localCatalogImagesDir: string | null | undefined;
+function localCatalogPosterPath(kind: "block" | "component", name: string): string | null {
+  if (localCatalogImagesDir === undefined) {
+    localCatalogImagesDir = null;
+    let dir = resolve(fileURLToPath(import.meta.url), "..");
+    for (let i = 0; i < 6; i++) {
+      const candidate = join(dir, "docs", "images", "catalog");
+      if (existsSync(candidate)) {
+        localCatalogImagesDir = candidate;
+        break;
+      }
+      dir = resolve(dir, "..");
+    }
+  }
+  if (!localCatalogImagesDir || !/^[a-z0-9][a-z0-9-]*$/.test(name)) return null;
+  const path = join(
+    localCatalogImagesDir,
+    kind === "component" ? "components" : "blocks",
+    `${name}.png`,
+  );
+  return existsSync(path) ? path : null;
+}
+
 // Under preview.ts's 3s process-exit watchdog, so shutdown() always returns
 // before that watchdog can fire and skip this file's browser cleanup.
 const RENDER_SHUTDOWN_WAIT_MS = 2_000;
@@ -850,7 +875,22 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
       const blockAndComponentEntries = entries.filter(
         (e) => e.type === "hyperframes:block" || e.type === "hyperframes:component",
       );
-      return loadAllItems(blockAndComponentEntries, registry);
+      const items = await loadAllItems(blockAndComponentEntries, registry);
+      // Fork: point items with no hosted preview at a local thumbnail, when one was generated.
+      return items.map((item) => {
+        if (item.preview?.poster || item.preview?.video) return item;
+        const kind = item.type === "hyperframes:component" ? "component" : "block";
+        if (!localCatalogPosterPath(kind, item.name)) return item;
+        return {
+          ...item,
+          preview: { ...item.preview, poster: `/api/registry/local-poster/${kind}/${item.name}` },
+        };
+      });
+    },
+
+    async readRegistryLocalPoster(kind, name) {
+      const path = localCatalogPosterPath(kind, name);
+      return path ? readFileSync(path) : null;
     },
 
     async installRegistryBlock(opts) {

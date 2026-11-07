@@ -251,6 +251,9 @@ export interface StudioApiAdapter {
   /** Optional: list all registry items (blocks + components) for the catalog. */
   listRegistryCatalog?(): Promise<RegistryItem[]>;
 
+  /** Optional (fork): a locally generated catalog thumbnail for an item that has no hosted one. */
+  readRegistryLocalPoster?(kind: "block" | "component", name: string): Promise<Buffer | null>;
+
   /** Optional: install a registry item into a project directory. */
   installRegistryBlock?(opts: {
     project: ResolvedProject;
