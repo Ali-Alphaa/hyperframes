@@ -52,11 +52,20 @@ def loudnorm_filter(path: str | Path, target: float, true_peak: float = -1.5, pr
 
 
 # ------------------------------------------------------------------------ clean
-def find_deepfilter() -> str | None:
-    for candidate in (shutil.which("deep-filter"), PACK_DIR.parent.parent.parent / "addons" / "bin" / "deep-filter.exe",
-                      Path.home() / "video-pipeline" / "addons" / "bin" / "deep-filter.exe"):
-        if candidate and Path(candidate).exists():
-            return str(candidate)
+PIPELINE = Path(os.environ.get("VIDEO_PIPELINE", Path.home() / "video-pipeline"))
+
+
+def find_deepfilter() -> list[str] | None:
+    """The command that runs DeepFilterNet, or None. Prefers the Python package installed from the repo clone
+    (~/video-pipeline/.df-venv + addons/DeepFilterNet), with the repo's own DeepFilterNet3 model so nothing is
+    downloaded; falls back to a deep-filter program on PATH or in addons/bin."""
+    py = PIPELINE / ".df-venv" / "Scripts" / "python.exe"
+    model = PIPELINE / "addons" / "DeepFilterNet" / "models" / "DeepFilterNet3"
+    if py.exists() and (model / "config.ini").exists():
+        return [str(py), "-m", "df.enhance", "-m", str(model)]
+    for exe in (shutil.which("deep-filter"), PIPELINE / "addons" / "bin" / "deep-filter.exe"):
+        if exe and Path(exe).exists():
+            return [str(exe)]
     return None
 
 
@@ -82,15 +91,15 @@ def clean(inp: str, out: str, engine: str = "auto", strength: str = "medium") ->
     if engine == "elevenlabs":
         return _clean_elevenlabs(inp, out)
     if engine == "deepfilter":
-        exe = find_deepfilter()
-        if not exe:
-            raise SystemExit("DeepFilterNet's deep-filter program isn't installed; use --engine ffmpeg")
+        command = find_deepfilter()
+        if not command:
+            raise SystemExit("DeepFilterNet isn't set up (see the Studio Pack README); use --engine ffmpeg")
         with tempfile.TemporaryDirectory() as tmp:
-            wav48 = Path(tmp) / "in.wav"
+            wav48 = Path(tmp) / "in.wav"  # DeepFilterNet only takes 48 kHz WAV
             run([FFMPEG, "-y", "-v", "error", "-i", inp, "-ac", "1", "-ar", "48000", str(wav48)])
-            run([exe, "-o", tmp + "/out", str(wav48)])
-            run([FFMPEG, "-y", "-v", "error", "-i", str(Path(tmp) / "out" / "in.wav"), "-af", "highpass=f=70",
-                 "-ar", "48000", out])
+            run(command + ["-o", str(Path(tmp) / "out"), str(wav48)])
+            result = next((Path(tmp) / "out").glob("*.wav"))  # the package appends the model name
+            run([FFMPEG, "-y", "-v", "error", "-i", str(result), "-af", "highpass=f=70", "-ar", "48000", out])
         return "deepfilter"
     run([FFMPEG, "-y", "-v", "error", "-i", inp, "-af", FFMPEG_CLEAN[strength], "-ar", "48000", out])
     return "ffmpeg"
