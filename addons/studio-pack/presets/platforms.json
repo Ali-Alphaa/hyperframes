@@ -1,0 +1,58 @@
+{
+  "_note": "Upload specs as of November 2026. Loudness: every platform normalises playback near -14 LUFS, so delivering at -14 keeps the mix as heard. max_seconds is the longest upload each accepts; X's is the limit for non-Premium accounts.",
+  "youtube": {
+    "label": "YouTube (16:9)",
+    "width": 1920,
+    "height": 1080,
+    "max_fps": 60,
+    "lufs": -14,
+    "true_peak": -1.0,
+    "max_seconds": 43200,
+    "video_bitrate": "12M",
+    "audio_bitrate": "320k"
+  },
+  "shorts": {
+    "label": "YouTube Shorts (9:16)",
+    "width": 1080,
+    "height": 1920,
+    "max_fps": 60,
+    "lufs": -14,
+    "true_peak": -1.0,
+    "max_seconds": 180,
+    "video_bitrate": "10M",
+    "audio_bitrate": "256k"
+  },
+  "tiktok": {
+    "label": "TikTok (9:16)",
+    "width": 1080,
+    "height": 1920,
+    "max_fps": 60,
+    "lufs": -14,
+    "true_peak": -1.0,
+    "max_seconds": 600,
+    "video_bitrate": "10M",
+    "audio_bitrate": "256k"
+  },
+  "reels": {
+    "label": "Instagram Reels (9:16)",
+    "width": 1080,
+    "height": 1920,
+    "max_fps": 60,
+    "lufs": -14,
+    "true_peak": -1.0,
+    "max_seconds": 180,
+    "video_bitrate": "10M",
+    "audio_bitrate": "256k"
+  },
+  "x": {
+    "label": "X (16:9)",
+    "width": 1920,
+    "height": 1080,
+    "max_fps": 60,
+    "lufs": -14,
+    "true_peak": -1.0,
+    "max_seconds": 140,
+    "video_bitrate": "10M",
+    "audio_bitrate": "256k"
+  }
+}
