@@ -48,17 +48,6 @@ project, so it used to kill the server behind another open window.) Only one Stu
 project again replaces the earlier server. Shortcuts start the launcher through `conhost --headless`, because Windows
 Terminal shows a window for it that kills the launcher when closed.
 
-## Faster Play
-
-Upstream Studio holds the picture after Play until the sound actually starts. On a PC whose sound device is slow to wake,
-that held Play for seconds, or for good when the device never reported progress. This fork (`packages/core/src/runtime`):
-the picture waits at most 0.8 s for sound (`AUDIO_START_WAIT_MS` in `clock.ts`, upstream 1.5 s and unbounded on a stuck
-device), and audio that is already downloaded no longer counts as buffering (`audioDownloadedAhead` in `init.ts`).
-Media sync brings the audio in line once it starts.
-
-The official HyperFrames desktop app isn't in this repository, so this is not that app. It has no Framey chat or Pro
-features, and Studio's "Install the desktop app" button leads to the official one.
-
 ## Catalog thumbnails
 
 HeyGen hosts preview images for only some catalog items, and Studio shows a plain category tile for the rest. This fork

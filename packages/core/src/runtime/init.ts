@@ -5762,7 +5762,6 @@ export function initSandboxRuntimeModular(): void {
   };
 
   const STARVED_AUDIO_HOLD_MS = 3000;
-  const DOWNLOADED_AUDIO_HOLD_MS = 800;
   let starvedAudio: { el: HTMLMediaElement; sinceMs: number } | null = null;
 
   const audioMayDrivePlayhead = (el: HTMLMediaElement): boolean => {
@@ -5771,9 +5770,7 @@ export function initSandboxRuntimeModular(): void {
       return true;
     }
     if (starvedAudio?.el !== el) starvedAudio = { el, sinceMs: performance.now() };
-    // Fork: downloaded audio is only waiting on the sound device, so hold the picture briefly.
-    const holdMs = audioDownloadedAhead(el) ? DOWNLOADED_AUDIO_HOLD_MS : STARVED_AUDIO_HOLD_MS;
-    return performance.now() - starvedAudio.sinceMs < holdMs;
+    return performance.now() - starvedAudio.sinceMs < STARVED_AUDIO_HOLD_MS;
   };
 
   function refreshTransportClockSource(): void {
@@ -5835,17 +5832,6 @@ export function initSandboxRuntimeModular(): void {
     return false;
   };
 
-  // Fork: audio whose data is already downloaded past the playhead isn't buffering. It reads as not
-  // ready only while the sound device wakes, and holding the whole film for that delayed Play by seconds.
-  const audioDownloadedAhead = (el: HTMLMediaElement): boolean => {
-    if (el.tagName !== "AUDIO" || el.readyState < HTMLMediaElement.HAVE_METADATA) return false;
-    const until = Math.min(el.currentTime + READY_AHEAD_SECONDS, el.duration) - 0.01;
-    for (let i = 0; i < el.buffered.length; i++) {
-      if (el.buffered.start(i) <= el.currentTime && el.buffered.end(i) >= until) return true;
-    }
-    return false;
-  };
-
   const mediaNotReadyAt = (t: number, ready = hasDataAhead): HTMLMediaElement[] =>
     state.nativeMediaSyncDisabled
       ? []
@@ -5854,7 +5840,6 @@ export function initSandboxRuntimeModular(): void {
             ({ el, start, end }) =>
               isInClipWindow(t, start, end) &&
               !ready(el) &&
-              !audioDownloadedAhead(el) &&
               isPlayableTrack(el) &&
               !stillStandsIn(el) &&
               !webAudio.ownsElement(el),

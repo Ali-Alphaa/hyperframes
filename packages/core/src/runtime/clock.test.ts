@@ -564,33 +564,3 @@ describe("TransportClock", () => {
     });
   });
 });
-
-describe("TransportClock — audio output slow to start (fork)", () => {
-  it("plays the picture on once the start wait runs out, then lets the audio catch up", () => {
-    const { clock, advance } = createClock();
-    // An element that is playing but whose output device has not started: its time does not move.
-    const el = {
-      paused: false,
-      currentTime: 0,
-      readyState: 4,
-      seeking: false,
-      loop: false,
-      duration: 60,
-    };
-    clock.play();
-    clock.attachAudioSource({
-      el: el as unknown as HTMLMediaElement,
-      compositionStart: 0,
-      mediaStart: 0,
-    });
-    advance(200);
-    expect(clock.now()).toBe(0); // held briefly, waiting for the sound to start
-    advancePolled(clock, advance, 800);
-    advancePolled(clock, advance, 1000);
-    expect(clock.now()).toBeGreaterThan(0.9); // no longer frozen on the silent element
-    el.currentTime = 0.05; // sound starts late, behind the picture
-    const before = clock.now();
-    advance(100);
-    expect(clock.now()).toBeGreaterThanOrEqual(before); // never jumps back to the late audio
-  });
-});
