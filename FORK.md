@@ -32,3 +32,16 @@ Then go to the Actions tab and disable any new workflows the merge brought in. T
 
 Working on it needs [Bun](https://bun.sh): `bun install`, `bun run build`, `bun run dev`. Existing video projects
 keep using the official `hyperframes` package from npm until they are pointed at this build.
+
+## Desktop app
+
+`tools/desktop/HyperFramesFork.ps1` opens this fork's Studio in its own window, and stops the Studio server when the
+window closes. `tools/desktop/install-shortcut.ps1` puts a "HyperFrames Fork" shortcut on the Windows desktop. It needs
+Chrome or Edge, and it runs the built files, so run `bun run build` after any code change or merge.
+
+The official HyperFrames desktop app isn't in this repository, so this is not that app. It has no Framey chat or Pro
+features, and Studio's "Install the desktop app" button leads to the official one.
+
+## Shorts Generator
+
+`tools/shorts-generator` cuts long videos into vertical clips. See its `README.md`.
