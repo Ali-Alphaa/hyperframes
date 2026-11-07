@@ -1,5 +1,5 @@
 # Opens this fork's HyperFrames Studio in its own desktop window.
-# Usage: HyperFramesFork.ps1 [project folder]. With no folder it lists your projects, last used first.
+# Usage: HyperFramesFork.ps1 [project folder]. With no folder it shows the Windows Explorer Open window.
 param([string]$Project)
 
 $ErrorActionPreference = 'Stop'
@@ -59,93 +59,44 @@ function Test-Project($dir) {
     return (Test-Path -LiteralPath (Join-Path $dir 'index.html')) -and (Test-Path -LiteralPath (Join-Path $dir 'hyperframes.json'))
 }
 
-# Project folders directly inside $root, plus $root itself if it is one. Reads names only, one level deep.
-function Find-Projects($root) {
-    if (-not (Test-Path -LiteralPath $root)) { return @() }
-    $dirs = @($root) + @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
-    return @($dirs | Where-Object { Test-Project $_ })
-}
-
-function Select-Project {
-    $desktop = [Environment]::GetFolderPath('Desktop')
-    $found = New-Object System.Collections.ArrayList
-    $add = { param($dir) if ($dir -and -not $found.Contains($dir)) { [void]$found.Add($dir) } }
-
+# Where the Explorer dialog starts: the folder holding the last project, else the first videos folder found.
+function Get-StartFolder {
     if (Test-Path -LiteralPath $lastFile) {
         $last = (Get-Content -LiteralPath $lastFile -Raw).Trim()
-        if ($last -and (Test-Project $last)) { & $add $last }
+        if ($last -and (Test-Path -LiteralPath $last)) { return (Split-Path -Parent $last) }
     }
-    foreach ($root in @(
-        "$desktop\video-pipeline\videos", "$desktop\ClaudeTransfer\videos", "$desktop\ClaudeTransfer",
-        "$env:USERPROFILE\video-pipeline\videos", 'F:\video-pipeline\videos', 'F:\ClaudeTransfer\videos'
-    )) {
-        foreach ($dir in Find-Projects $root) { & $add $dir }
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    foreach ($dir in @("$desktop\video-pipeline\videos", "$desktop\ClaudeTransfer\videos", 'F:\video-pipeline\videos', $desktop)) {
+        if (Test-Path -LiteralPath $dir) { return $dir }
     }
+    return $desktop
+}
 
+# The standard Windows Explorer "Open" window. Go into a project folder and open its index.html.
+function Select-Project {
     [System.Windows.Forms.Application]::EnableVisualStyles()
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'HyperFrames Fork'
-    $form.ClientSize = New-Object System.Drawing.Size(640, 330)
-    $form.StartPosition = 'CenterScreen'
-    $form.FormBorderStyle = 'FixedDialog'
-    $form.MaximizeBox = $false
-    $form.TopMost = $true
-    $form.Font = New-Object System.Drawing.Font('Segoe UI', 10)
-
-    $label = New-Object System.Windows.Forms.Label
-    $label.Text = if ($found.Count) { 'Choose a project to open:' } else { 'No projects found yet. Click Browse to find one.' }
-    $label.SetBounds(14, 12, 610, 24)
-
-    $list = New-Object System.Windows.Forms.ListBox
-    $list.SetBounds(14, 40, 612, 230)
-    $list.HorizontalScrollbar = $true
-    foreach ($dir in $found) { [void]$list.Items.Add($dir) }
-    if ($found.Count) { $list.SelectedIndex = 0 }
-
-    $open = New-Object System.Windows.Forms.Button
-    $open.Text = 'Open'
-    $open.SetBounds(356, 282, 86, 32)
-    $browse = New-Object System.Windows.Forms.Button
-    $browse.Text = 'Browse...'
-    $browse.SetBounds(448, 282, 86, 32)
-    $cancel = New-Object System.Windows.Forms.Button
-    $cancel.Text = 'Cancel'
-    $cancel.SetBounds(540, 282, 86, 32)
-    $cancel.DialogResult = 'Cancel'
-    $form.AcceptButton = $open
-    $form.CancelButton = $cancel
-
-    $accept = {
-        if ($list.SelectedItem) {
-            $form.Tag = [string]$list.SelectedItem
-            $form.DialogResult = 'OK'
-            $form.Close()
-        }
-    }
-    $open.Add_Click($accept)
-    $list.Add_DoubleClick($accept)
-    $browse.Add_Click({
-        $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-        $dialog.Description = 'Choose a HyperFrames project folder, or a folder that contains projects'
-        $dialog.SelectedPath = $desktop
-        if ($dialog.ShowDialog($form) -ne 'OK') { return }
-        $hits = @(Find-Projects $dialog.SelectedPath)
-        if (-not $hits.Count) {
+    $owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; Opacity = 0 }
+    $owner.Show()
+    $dialog = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.Title = 'HyperFrames Fork - open a project (choose its index.html)'
+    $dialog.Filter = 'HyperFrames project (index.html, hyperframes.json)|index.html;hyperframes.json|All files (*.*)|*.*'
+    $dialog.InitialDirectory = Get-StartFolder
+    $dialog.AutoUpgradeEnabled = $true
+    try {
+        while ($dialog.ShowDialog($owner) -eq 'OK') {
+            $dir = Split-Path -Parent $dialog.FileName
+            if (Test-Project $dir) { return $dir }
             [System.Windows.Forms.MessageBox]::Show(
-                $form,
-                "No HyperFrames project there. A project folder has both index.html and hyperframes.json.`n`n$($dialog.SelectedPath)",
+                $owner,
+                "That isn't a HyperFrames project. Open the index.html inside a project folder (one that also has hyperframes.json).`n`n$dir",
                 'HyperFrames Fork', 'OK', 'Information'
             ) | Out-Null
-            return
+            $dialog.InitialDirectory = $dir
         }
-        foreach ($dir in $hits) { if (-not $list.Items.Contains($dir)) { [void]$list.Items.Add($dir) } }
-        $list.SelectedItem = $hits[0]
-        $label.Text = 'Choose a project to open:'
-    })
-
-    $form.Controls.AddRange(@($label, $list, $open, $browse, $cancel))
-    if ($form.ShowDialog() -ne 'OK') { return $null }
-    return [string]$form.Tag
+    } finally {
+        $owner.Close()
+    }
+    return $null
 }
 
 if (-not $Project) {

@@ -26,7 +26,10 @@ export type AudioClockSource =
 const STALL_THRESHOLD_MS = 500;
 const STALL_ADJUSTED_LAG_MS = 33;
 const HAVE_FUTURE_DATA = 3;
-const AUDIO_START_WAIT_MS = 1500;
+// Fork: was 1500, and a sound device that never reported progress froze the picture for good.
+// Now a device slower than this to wake no longer holds the picture: it plays on, and media sync
+// brings the audio in line once it starts. 800 still covers audio that starts 700 ms late.
+const AUDIO_START_WAIT_MS = 800;
 const MEDIA_SYNC_STEER_TOLERANCE_SECONDS = 0.04;
 
 type PendingAudioStart = { sinceMs: number; at: number; from: number | null };
@@ -45,6 +48,8 @@ export class TransportClock {
   private _lastReadMs: number | null = null;
   private _lastNow = 0;
   private _audioStart: PendingAudioStart | null = null;
+  /** Element time the audio still sat at when the start wait ran out; the picture won't wait on it. */
+  private _silentAt: number | null = null;
 
   constructor(opts?: {
     initialTime?: number;
@@ -96,11 +101,26 @@ export class TransportClock {
     if (el.paused || !Number.isFinite(el.currentTime)) return null;
     const spec = rate ?? 1;
     const time = timeAtSourceTime(spec, el.currentTime - mediaStart) + compositionStart;
-    const held = this._heldUntilAudioOutputStarts(el.seeking, time);
+    const held = this._startHold(el.seeking, time);
     if (held !== undefined) return held;
     if (time >= this._lastNow) return time;
     const wrapped = el.loop && this._lastNow - time > timeAtSourceTime(spec, el.duration) / 2;
     return !wrapped && el.readyState < HAVE_FUTURE_DATA ? this._lastNow : null;
+  }
+
+  /** The start hold, then: output still hasn't started, so follow the monotonic clock (null). */
+  private _startHold(seeking: boolean, time: number): number | null | undefined {
+    const held = this._heldUntilAudioOutputStarts(seeking, time);
+    if (held !== undefined) return held;
+    return this._stillSilent(time) ? null : undefined;
+  }
+
+  /** True while the element still sits where it was when the start wait ran out. */
+  private _stillSilent(time: number): boolean {
+    if (this._silentAt === null) return false;
+    if (time === this._silentAt) return true;
+    this._silentAt = null;
+    return false;
   }
 
   private _heldUntilAudioOutputStarts(seeking: boolean, time: number): number | null | undefined {
@@ -116,7 +136,10 @@ export class TransportClock {
 
   private _pendingAudioStart(): PendingAudioStart | null {
     const pending = this._audioStart;
-    if (pending && this._nowMs() - pending.sinceMs > AUDIO_START_WAIT_MS) this._audioStart = null;
+    if (pending && this._nowMs() - pending.sinceMs > AUDIO_START_WAIT_MS) {
+      this._audioStart = null;
+      this._silentAt = pending.from;
+    }
     return this._audioStart;
   }
 
@@ -138,6 +161,7 @@ export class TransportClock {
     if (this._baseTime >= this.getEnd()) return false;
     this._playStartMs = this._nowMs();
     this._audioStart = { sinceMs: this._playStartMs, at: this._baseTime, from: null };
+    this._silentAt = null;
     this._lastNow = this._baseTime;
     // Not a stall: the gap since the clock was last read (possibly a long
     // paused idle) says nothing about lost playback time, since none was
@@ -163,6 +187,7 @@ export class TransportClock {
     if (this._playStartMs !== null) {
       this._playStartMs = this._nowMs();
       this._audioStart = { sinceMs: this._playStartMs, at: clamped, from: null };
+      this._silentAt = null;
       // Same reasoning as `play()`: the seek itself, not any elapsed gap
       // since the last read, is why the reported time is moving now.
       this._lastReadMs = null;

@@ -40,6 +40,16 @@ window closes. `tools/desktop/install-shortcut.ps1` puts a "HyperFrames Fork" sh
 Chrome or Edge, and it runs the built files, so run `bun run build` after any code change or merge.
 
 The window opens in your normal browser profile. A separate, fresh profile played the preview without sound on this PC.
+To pick a project it shows the standard Windows Explorer Open window: go into the project folder and open its
+`index.html`.
+
+## Faster Play
+
+Upstream Studio holds the picture after Play until the sound actually starts. On a PC whose sound device is slow to wake,
+that held Play for seconds, or for good when the device never reported progress. This fork (`packages/core/src/runtime`):
+the picture waits at most 0.8 s for sound (`AUDIO_START_WAIT_MS` in `clock.ts`, upstream 1.5 s and unbounded on a stuck
+device), and audio that is already downloaded no longer counts as buffering (`audioDownloadedAhead` in `init.ts`).
+Media sync brings the audio in line once it starts.
 
 The official HyperFrames desktop app isn't in this repository, so this is not that app. It has no Framey chat or Pro
 features, and Studio's "Install the desktop app" button leads to the official one.
