@@ -12,7 +12,7 @@ is the "HyperFrames Studio Pack plan" doc.
 | 4 Motion blocks   | planned | audio-reactive, Lottie, picture-in-picture, loop easing                                               |
 | 5 Voice cloning   | planned | local clone of your own voice                                                                         |
 | 6 Footage search  | done    | index a folder (faster-whisper + CLIP), search spoken or visual, contact sheet, export                |
-| 7 Publishing      | planned | Postiz drafts, Buffer backup, approval per post                                                       |
+| 7 Publishing      | done    | Postiz drafts, approve/cancel with a log, Buffer route for TikTok and Instagram                       |
 
 ## Setup
 
@@ -84,3 +84,10 @@ falls back on).
 ```
 
 Usage is in `skill/SKILL.md`.
+
+## Publishing setup
+
+The `postiz` command-line tool (`npm install -g postiz`) and two user settings the user saves themselves:
+`POSTIZ_API_KEY` (Postiz: Settings, Public API) and `POSTIZ_API_URL` (a self-hosted Postiz serves its API under
+`/api`, e.g. `https://postiz.example.com/api`). `studio_publish.py` reads them from the environment or the Windows
+user settings and never prints the key.
