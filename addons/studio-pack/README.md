@@ -65,6 +65,15 @@ uv pip install --python ~/video-pipeline/.voice-venv/Scripts/python.exe torch==2
 uv pip install --python ~/video-pipeline/.voice-venv/Scripts/python.exe chatterbox-tts resemblyzer soundfile
 ```
 
+F5-TTS (the engine that keeps the user's accent) has its own environment too; its model (about 1.3 GB) downloads
+from Hugging Face on first use, and enrolment transcribes with faster-whisper in `~/video-pipeline/.venv`:
+
+```bash
+UV_PYTHON_INSTALL_DIR=~/video-pipeline/.python uv venv --python 3.11 ~/video-pipeline/.f5-venv
+uv pip install --python ~/video-pipeline/.f5-venv/Scripts/python.exe torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+uv pip install --python ~/video-pipeline/.f5-venv/Scripts/python.exe f5-tts soundfile
+```
+
 Keep OpenCV below 5 (Real-ESRGAN's package pulls in the newest, and OpenCV 5 dropped the face detector reframe
 falls back on).
 

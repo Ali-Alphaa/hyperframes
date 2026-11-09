@@ -150,11 +150,16 @@ $PY $PACK/studio_voice.py script kokoro script.txt --out-dir assets/vo/stock --k
 - The user records with the "Record voice sample" shortcut on their Desktop (it opens the script and runs
   `record`, which saves to Desktop/video-pipeline/recordings/). Their Rode plugs into the jack and appears as
   "Jack Mic (Realtek(R) Audio)".
-- Speed: about real time with the laptop on mains power. On battery the GPU is capped near 300 MHz and each
+- Speed: about 10 s a line plus ~20 s loading, on mains power. On battery the GPU is capped near 300 MHz and each
   second of speech takes ~14 s: check `nvidia-smi` clocks and ask the user to plug in before a long script.
-- Chatterbox runs locally on the GPU (in `~/video-pipeline/.voice-venv`) and adds an inaudible watermark.
-  `--exaggeration` 0.25-1 sets expressiveness (0.5 default; 0.7 for energetic hooks), `--cfg` 0.3-0.7 sets pace
-  (lower = slower, steadier). Same text and settings give the same take.
+- The user's voice is `ali`, on F5-TTS at 151 words a minute (chosen by ear). F5-TTS continues from a short clip
+  of their own speech and keeps their accent; Chatterbox drifted toward an American accent, so don't switch back.
+  F5-TTS runs in `~/video-pipeline/.f5-venv`; Chatterbox stays available with `--engine chatterbox`.
+- `set NAME --f5-from recording.wav` adds F5-TTS to a voice: it transcribes the recording and picks 6-11 s of
+  whole sentences as the reference. `set NAME --pace 151` sets words per minute; every script is stretched as a
+  whole to that pace with pitch kept (rubberband). `--pace 0` on say/script leaves the pace as generated.
+- To enrol a new voice with F5-TTS in one go: `enrol NAME rec.wav --consent "..." --no-clean --f5` (a good mic in a
+  quiet room clones better without cleanup).
 - Lines come out trimmed, 48 kHz, -16 LUFS: ready for `studio_audio.py duck` and the platform export.
   `manifest.json` lists each line's duration for laying out `data-start` / `data-duration`.
 - Check a cloned line before using it: transcribe it (faster-whisper) and compare with the text; regenerate any

@@ -80,3 +80,38 @@ def test_elevenlabs_is_off_without_your_keys(tmp_path, monkeypatch):
     monkeypatch.delenv("ELEVENLABS_VOICE_ID", raising=False)
     with pytest.raises(SystemExit, match="paid option"):
         sv.speak_lines(None, [{"text": "hi", "out": str(tmp_path / "o.wav")}], engine="elevenlabs")
+
+
+SEGMENTS = [
+    {"start": 8.8, "end": 11.4, "text": "Testing, one, two, three, this is my normal voice."},
+    {"start": 18.9, "end": 22.7, "text": "This is my voice and I'm recording it."},
+    {"start": 23.4, "end": 24.98, "text": "Today we're looking at a simple question."},
+    {"start": 25.74, "end": 28.26, "text": "Is this move a pullback or the start of a reversal?"},
+    {"start": 29.1, "end": 31.3, "text": "A pullback is a pause inside a trend."},
+    {"start": 32.58, "end": 35.66, "text": "Price steps back, finds support and continues."},
+    {"start": 40.0, "end": 41.0, "text": "Done."},
+]
+
+
+def test_reference_is_whole_sentences_of_six_to_eleven_seconds():
+    ref = sv.pick_reference(SEGMENTS)
+    assert 6 <= ref["end"] - ref["start"] <= 11
+    assert ref["text"].endswith((".", "?", "!")) and "Testing" not in ref["text"]
+    assert ref["start"] >= 20, "skips the warm-up at the start"
+
+
+def test_no_reference_when_speech_is_too_choppy():
+    choppy = [{"start": i * 3.0, "end": i * 3.0 + 1.0, "text": "Word."} for i in range(10)]
+    assert sv.pick_reference(choppy) is None
+
+
+def test_speaking_pace_counts_talking_time():
+    segs = [{"start": 0, "end": 30, "text": " ".join(["word"] * 60)}, {"start": 40, "end": 70, "text": " ".join(["w"] * 60)}]
+    assert sv.speaking_pace(segs) == 120.0
+
+
+def test_f5_needs_its_setup(tmp_path, voices):
+    sf.write(tmp_path / "s.wav", speechlike(20), SR)
+    sv.enrol("me", str(tmp_path / "s.wav"), "This is my own voice")
+    with pytest.raises(SystemExit, match="F5-TTS isn't set up"):
+        sv.speak_lines("me", [{"text": "hi", "out": str(tmp_path / "o.wav")}], engine="f5")

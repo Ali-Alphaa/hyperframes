@@ -6,8 +6,9 @@
   script  speak a whole script, one file per line, with a manifest of durations for the composition
   voices  list stored voices
 
-Engines: chatterbox (default for cloned voices; local, GPU, adds an inaudible watermark), kokoro (HyperFrames'
-built-in stock voices, the project default), elevenlabs (paid; only with your own ELEVENLABS_API_KEY and the id of
+Engines: f5 (F5-TTS: continues from a short clip of your own speech, so it keeps your accent; local, GPU; the
+default for a voice enrolled with it), chatterbox (local, GPU, adds an inaudible watermark; can drift toward an
+American accent), kokoro (HyperFrames' built-in stock voices, the project default), elevenlabs (paid; only with your own ELEVENLABS_API_KEY and the id of
 a voice you made in your ElevenLabs account, ELEVENLABS_VOICE_ID; nothing is uploaded by this tool).
 
 Only your own voice, or a voice whose owner has agreed in writing: enrol refuses without --consent.
@@ -35,6 +36,10 @@ VOICES = Path(os.environ.get("STUDIO_VOICES", PIPELINE / "voices"))
 VOICE_PY = PIPELINE / ".voice-venv" / "Scripts" / "python.exe"
 WORKER = Path(__file__).resolve().parent / "voice_worker.py"
 CLI = Path(__file__).resolve().parents[3] / "packages" / "cli" / "dist" / "cli.js"
+F5_PY = PIPELINE / ".f5-venv" / "Scripts" / "python.exe"
+F5_WORKER = Path(__file__).resolve().parent / "f5_worker.py"
+WHISPER_PY = PIPELINE / ".venv" / "Scripts" / "python.exe"
+TRANSCRIBE_WORKER = Path(__file__).resolve().parent / "transcribe_worker.py"
 CONSENT_WORDS = re.compile(r"\b(my own voice|my voice|i consent|consent|agreed|permission)\b", re.I)
 
 
@@ -76,7 +81,8 @@ def _clipped_moments(path: str) -> int:
     return int(np.count_nonzero(np.diff(hot.astype(np.int8)) == 1))
 
 
-def enrol(name: str, sample: str, consent: str) -> Path:
+def enrol(name: str, sample: str, consent: str, clean_sample: bool = True, start: float = 0.0,
+          seconds: float = 60.0) -> Path:
     if not re.fullmatch(r"[a-z][a-z0-9-]{1,30}", name):
         raise SystemExit("voice name: lowercase letters, digits and dashes")
     if not consent or not CONSENT_WORDS.search(consent):
@@ -86,12 +92,16 @@ def enrol(name: str, sample: str, consent: str) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         cleaned = Path(tmp) / "clean.wav"
-        engine = clean(sample, str(cleaned))  # DeepFilterNet when set up
+        if clean_sample:
+            engine = clean(sample, str(cleaned))  # DeepFilterNet when set up
+        else:  # a good mic in a quiet room: cleaning can dull the voice the clone learns from
+            run([FFMPEG, "-y", "-v", "error", "-i", sample, "-af", "highpass=f=60", "-ar", "48000", str(cleaned)])
+            engine = "none (highpass only)"
         trimmed = Path(tmp) / "trim.wav"
         # drop long silences (keeps the voice dense) and use at most the first 60 s
         run([FFMPEG, "-y", "-v", "error", "-i", str(cleaned), "-af",
              "silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:stop_duration=0.6:stop_threshold=-45dB",
-             "-t", "60", "-ac", "1", "-ar", "24000", str(trimmed)])
+             "-ss", f"{start:g}", "-t", f"{seconds:g}", "-ac", "1", "-ar", "24000", str(trimmed)])
         level(str(trimmed), str(folder / "reference.wav"), target=-20)
     meta = {"name": name, "created": dt.datetime.now().isoformat(timespec="seconds"), "source": str(Path(sample).name),
             "consent": consent, "cleaned_with": engine, "sample": report}
@@ -160,6 +170,67 @@ def record(out: Path, device: str | None = None, max_seconds: int = 180) -> Path
     return out
 
 
+# ---------------------------------------------------------- F5 reference + pace
+def transcribe_segments(path: str) -> list[dict]:
+    proc = subprocess.run([str(WHISPER_PY), str(TRANSCRIBE_WORKER), path], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+    if proc.returncode != 0:
+        raise SystemExit(f"transcribing the sample failed: {proc.stderr[-800:]}")
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+def pick_reference(segments: list[dict], lo: float = 6.0, hi: float = 11.0, max_gap: float = 1.4) -> dict | None:
+    """The best run of whole sentences for F5-TTS: 6-11 s, no long pause inside, ideally about 8 s, and not the
+    first 20 s (people warm up) or a mic test."""
+    usable = [s for s in segments if not re.search(r"\btesting\b|\bone,? two,? three\b", s["text"], re.I)]
+    best, best_score = None, None
+    for i in range(len(usable)):
+        for j in range(i, len(usable)):
+            if j > i and usable[j]["start"] - usable[j - 1]["end"] > max_gap:
+                break
+            span = usable[j]["end"] - usable[i]["start"]
+            if span > hi:
+                break
+            if span >= lo and usable[j]["text"].rstrip().endswith((".", "?", "!")):
+                score = -abs(span - 8.0) - (2.0 if usable[i]["start"] < 20 else 0.0)
+                if best_score is None or score > best_score:
+                    best_score = score
+                    best = {"start": usable[i]["start"], "end": usable[j]["end"],
+                            "text": " ".join(x["text"] for x in usable[i:j + 1])}
+    return best
+
+
+def speaking_pace(segments: list[dict]) -> float:
+    """Words per minute while talking (pauses between sentences left out)."""
+    words = sum(word_count(s["text"]) for s in segments)
+    talking = sum(s["end"] - s["start"] for s in segments)
+    return round(words / talking * 60, 1) if talking else 0.0
+
+
+def add_f5(name: str, sample: str, ref: dict | None = None) -> dict:
+    """Store an F5-TTS reference clip (and the words in it) with an enrolled voice, plus its natural pace."""
+    folder = VOICES / name
+    meta = json.loads((folder / "voice.json").read_text(encoding="utf-8"))
+    segments = transcribe_segments(sample)
+    ref = ref or pick_reference(segments)
+    if not ref:
+        raise SystemExit("couldn't find 6-11 s of continuous speech for F5-TTS in the recording")
+    pad = 0.15
+    run([FFMPEG, "-y", "-v", "error", "-ss", f"{max(0.0, ref['start'] - pad):.2f}", "-to", f"{ref['end'] + pad:.2f}",
+         "-i", sample, "-af", "highpass=f=60", "-ar", "24000", "-ac", "1", str(folder / "f5_reference.wav")])
+    meta["f5"] = {"reference": "f5_reference.wav", "text": ref["text"], "start": ref["start"], "end": ref["end"]}
+    meta["engine"] = "f5"
+    # Talking time only, so it reads high (about 230 for a 140-word-a-minute speaker): a record, not a default.
+    # The pace a voice is made at is chosen by ear and set with `set NAME --pace`.
+    meta["natural_pace_wpm"] = speaking_pace(segments)
+    (folder / "voice.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    return meta
+
+
+def word_count(text: str) -> int:
+    return len(re.findall(r"[A-Za-z0-9']+", text))
+
+
 def load_voice(name: str) -> dict:
     meta_path = VOICES / name / "voice.json"
     if not meta_path.exists():
@@ -173,22 +244,32 @@ def load_voice(name: str) -> dict:
 
 # ---------------------------------------------------------------------- speaking
 def speak_lines(voice: str | None, lines: list[dict], engine: str = "auto", exaggeration: float = 0.5,
-                cfg: float = 0.5, kokoro_voice: str = "am_michael") -> str:
+                cfg: float = 0.5, kokoro_voice: str = "am_michael", pace: float | None = None) -> str:
     """lines: [{"text", "out"}]. Writes 48 kHz WAVs at -16 LUFS (the level the audio tools expect)."""
+    meta = load_voice(voice) if voice else {}
     if engine == "auto":
-        engine = "chatterbox" if voice else "kokoro"
+        engine = meta.get("engine", "chatterbox") if voice else "kokoro"
+    target_wpm = meta.get("pace_wpm") if pace is None else (pace or None)
     with tempfile.TemporaryDirectory() as tmp:
         raw = [dict(line, raw=str(Path(tmp) / f"{i:03d}.wav")) for i, line in enumerate(lines)]
         if engine == "chatterbox":
             if not VOICE_PY.exists():
                 raise SystemExit("the voice environment isn't set up (see the Studio Pack README)")
-            meta = load_voice(voice)
             job = {"reference": meta["reference"], "exaggeration": exaggeration, "cfg": cfg,
                    "lines": [{"text": r["text"], "out": r["raw"]} for r in raw]}
             proc = subprocess.run([str(VOICE_PY), str(WORKER)], input=json.dumps(job), capture_output=True,
                                   text=True, encoding="utf-8", errors="replace")
             if proc.returncode != 0:
                 raise SystemExit(f"voice generation failed: {proc.stderr[-1500:]}")
+        elif engine == "f5":
+            if not F5_PY.exists() or "f5" not in meta:
+                raise SystemExit("F5-TTS isn't set up for this voice (see the Studio Pack README: set --f5-from)")
+            job = {"reference": str(VOICES / voice / meta["f5"]["reference"]), "reference_text": meta["f5"]["text"],
+                   "speed": meta.get("f5_speed", 0.7), "lines": [{"text": r["text"], "out": r["raw"]} for r in raw]}
+            proc = subprocess.run([str(F5_PY), str(F5_WORKER)], input=json.dumps(job), capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace")
+            if proc.returncode != 0:
+                raise SystemExit(f"F5-TTS failed: {proc.stderr[-1500:]}")
         elif engine == "kokoro":
             for r in raw:
                 run(["node", str(CLI), "tts", r["text"], "-v", kokoro_voice, "-o", r["raw"]])
@@ -196,16 +277,37 @@ def speak_lines(voice: str | None, lines: list[dict], engine: str = "auto", exag
             _elevenlabs(raw)
         else:
             raise SystemExit(f"unknown engine {engine}")
+        trimmed_files = []
         for r in raw:
-            # trim the silence models leave at both ends, then a consistent level
+            # trim the silence models leave at both ends
             trimmed = r["raw"] + ".trim.wav"
+            trimmed_files.append(trimmed)
             run([FFMPEG, "-y", "-v", "error", "-i", r["raw"], "-af",
                  # gentle: a soft first word ("The ...") must survive; keep 80 ms of lead-in and tail
                  "silenceremove=start_periods=1:start_threshold=-60dB:start_silence=0.08,areverse,"
                  "silenceremove=start_periods=1:start_threshold=-60dB:start_silence=0.08,areverse",
                  "-ar", "48000", "-ac", "1", trimmed])
+        # pace: stretch every line by the same amount (pitch kept) so the whole script lands on the voice's pace
+        tempo = 1.0
+        if target_wpm:
+            words = sum(word_count(r["text"]) for r in raw)
+            seconds = sum(_seconds(t) for t in trimmed_files)
+            if words and seconds:
+                tempo = max(0.7, min(1.3, target_wpm / (words / seconds * 60)))
+        for r, trimmed in zip(raw, trimmed_files):
+            if abs(tempo - 1) > 0.02:
+                paced = trimmed + ".pace.wav"
+                run([FFMPEG, "-y", "-v", "error", "-i", trimmed, "-af",
+                     f"rubberband=tempo={tempo:.3f}:pitch=1:transients=smooth:formant=preserved", paced])
+                trimmed = paced
             level(trimmed, r["out"], target=-16)
     return engine
+
+
+def _seconds(path: str) -> float:
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+                         capture_output=True, text=True, check=True).stdout
+    return float(out.strip())
 
 
 def _elevenlabs(raw: list[dict]) -> None:
@@ -243,11 +345,21 @@ def main(argv: list[str] | None = None) -> int:
     e = sub.add_parser("enrol", aliases=["enroll"], help="store a recording of your own voice")
     e.add_argument("name"), e.add_argument("sample")
     e.add_argument("--consent", required=True, help='e.g. "This is my own voice"')
+    e.add_argument("--no-clean", action="store_true", help="skip noise cleanup (clean mic, quiet room)")
+    e.add_argument("--start", type=float, default=0.0, help="use the sample from here (seconds)")
+    e.add_argument("--seconds", type=float, default=60.0, help="use this much of the sample")
+    e.add_argument("--f5", action="store_true", help="also set the voice up for F5-TTS (keeps your accent)")
+    st = sub.add_parser("set", help="change a voice's settings")
+    st.add_argument("voice")
+    st.add_argument("--pace", type=float, help="words per minute")
+    st.add_argument("--engine", choices=["f5", "chatterbox"])
+    st.add_argument("--f5-from", help="add F5-TTS to an existing voice from this recording")
     c = sub.add_parser("check", help="check a recording without enrolling it")
     c.add_argument("sample")
     for p in (s := sub.add_parser("say", help="speak one line")), (sc := sub.add_parser("script", help="speak a script")):
         p.add_argument("voice", help="an enrolled voice, or 'kokoro'")
-        p.add_argument("--engine", choices=["auto", "chatterbox", "kokoro", "elevenlabs"], default="auto")
+        p.add_argument("--engine", choices=["auto", "f5", "chatterbox", "kokoro", "elevenlabs"], default="auto")
+        p.add_argument("--pace", type=float, help="words per minute (default: the voice's pace; 0 = as made)")
         p.add_argument("--exaggeration", type=float, default=0.5, help="expressiveness 0.25-1 (default 0.5)")
         p.add_argument("--cfg", type=float, default=0.5, help="pace/stability 0.2-0.8 (default 0.5)")
         p.add_argument("--kokoro-voice", default="am_michael")
@@ -271,10 +383,24 @@ def main(argv: list[str] | None = None) -> int:
         print("\nNext: tell Claude the recording is ready.")
         return 0
     if a.cmd in ("enrol", "enroll"):
-        folder = enrol(a.name, a.sample, a.consent)
+        folder = enrol(a.name, a.sample, a.consent, not a.no_clean, a.start, a.seconds)
+        if a.f5:
+            add_f5(a.name, a.sample)
         meta = json.loads((folder / "voice.json").read_text(encoding="utf-8"))
         print(json.dumps(meta["sample"], indent=1))
         print(f"voice {a.name!r} stored in {folder}")
+    elif a.cmd == "set":
+        load_voice(a.voice)  # refuses a voice without consent
+        if a.f5_from:
+            add_f5(a.voice, a.f5_from)
+        path = VOICES / a.voice / "voice.json"
+        meta = json.loads(path.read_text(encoding="utf-8"))
+        if a.pace is not None:
+            meta["pace_wpm"] = a.pace
+        if a.engine:
+            meta["engine"] = a.engine
+        path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        print(json.dumps({k: meta.get(k) for k in ("engine", "pace_wpm", "natural_pace_wpm", "f5")}, indent=1))
     elif a.cmd == "check":
         print(json.dumps(check_sample(a.sample), indent=1))
     elif a.cmd == "voices":
@@ -285,14 +411,15 @@ def main(argv: list[str] | None = None) -> int:
         voice = None if a.voice == "kokoro" else a.voice
         engine = "kokoro" if a.voice == "kokoro" else a.engine
         if a.cmd == "say":
-            used = speak_lines(voice, [{"text": a.text, "out": a.output}], engine, a.exaggeration, a.cfg, a.kokoro_voice)
+            used = speak_lines(voice, [{"text": a.text, "out": a.output}], engine, a.exaggeration, a.cfg,
+                               a.kokoro_voice, a.pace)
             print(f"{used}: {a.output} ({duration(a.output)} s)")
         else:
             lines = split_script(Path(a.script).read_text(encoding="utf-8"))
             out_dir = Path(a.out_dir)
             out_dir.mkdir(parents=True, exist_ok=True)
             jobs = [{"text": t, "out": str(out_dir / f"l{i:02d}.wav")} for i, t in enumerate(lines)]
-            used = speak_lines(voice, jobs, engine, a.exaggeration, a.cfg, a.kokoro_voice)
+            used = speak_lines(voice, jobs, engine, a.exaggeration, a.cfg, a.kokoro_voice, a.pace)
             manifest = [{"id": f"l{i:02d}", "text": j["text"], "file": Path(j["out"]).name,
                          "duration": duration(j["out"])} for i, j in enumerate(jobs)]
             (out_dir / "manifest.json").write_text(json.dumps({"engine": used, "voice": a.voice, "lines": manifest},
