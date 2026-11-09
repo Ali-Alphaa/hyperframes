@@ -152,7 +152,7 @@ $PY $PACK/studio_voice.py script kokoro script.txt --out-dir assets/vo/stock --k
   "Jack Mic (Realtek(R) Audio)".
 - Speed: about 10 s a line plus ~20 s loading, on mains power. On battery the GPU is capped near 300 MHz and each
   second of speech takes ~14 s: check `nvidia-smi` clocks and ask the user to plug in before a long script.
-- The user's voice is `ali`, on F5-TTS at 151 words a minute (chosen by ear). F5-TTS continues from a short clip
+- The user's voice is `ali`, on F5-TTS at 166 words a minute (chosen by ear: 137 and 151 were too slow). F5-TTS continues from a short clip
   of their own speech and keeps their accent; Chatterbox drifted toward an American accent, so don't switch back.
   F5-TTS runs in `~/video-pipeline/.f5-venv`; Chatterbox stays available with `--engine chatterbox`.
 - `set NAME --f5-from recording.wav` adds F5-TTS to a voice: it transcribes the recording and picks 6-11 s of
