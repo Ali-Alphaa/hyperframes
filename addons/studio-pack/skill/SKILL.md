@@ -3,7 +3,7 @@ name: studio-pack
 description: Fork add-on with DaVinci Resolve-style finishing tools for HyperFrames projects. Use for voice cleanup (noise, hum, echo), dialogue leveling, beat detection when `hyperframes beats` finds none, snapping cuts to beats, auto-ducking music under voice clips, and exporting one render to YouTube, Shorts, TikTok, Reels and X specs. Use before publishing any video.
 ---
 
-# Studio Pack (batches 1-5: audio, export, reframe, footage fixes, colour, motion blocks, voice)
+# Studio Pack (batches 1-6: audio, export, reframe, footage fixes, colour, motion blocks, voice, search)
 
 Tools live in the fork at `addons/studio-pack/tools/`. Run them with the shared environment:
 
@@ -166,6 +166,22 @@ $PY $PACK/studio_voice.py script kokoro script.txt --out-dir assets/vo/stock --k
   line with skipped or garbled words (change `--cfg` slightly to get a different take).
 - ElevenLabs (paid): `--engine elevenlabs` only when the user has set `ELEVENLABS_API_KEY` and
   `ELEVENLABS_VOICE_ID` (a voice they made in their ElevenLabs account). This tool never uploads a voice sample.
+
+## Footage search (find the clip where something is said or shown)
+
+```bash
+$PY $PACK/studio_search.py index footage/                     # first time: minutes; then only new/changed files
+$PY $PACK/studio_search.py search footage/ "pullback" --spoken
+$PY $PACK/studio_search.py search footage/ "a red chart falling" --visual --sheet hits.jpg
+$PY $PACK/studio_search.py export footage/ "pullback" --spoken --pick 1 --out assets/clips/pullback.mp4
+```
+
+- Spoken search matches the words in the transcript (word forms too); it can't see text that is only on screen.
+  Visual search matches meaning with CLIP; describe what you'd see ("two people talking at a desk").
+- Always open the `--sheet` contact sheet before using a visual hit: CLIP scores are close together (0.25-0.31),
+  and the top hit isn't always the one the user means. Blank and fade frames are left out automatically.
+- Re-run `index` after adding footage. The index is in `<folder>/.studio-index/` (a few MB); delete it to rebuild.
+- Transcription runs in `~/video-pipeline/.venv` (faster-whisper), CLIP in `~/video-pipeline/.voice-venv` (GPU).
 
 ## Export for platforms (after the final render)
 

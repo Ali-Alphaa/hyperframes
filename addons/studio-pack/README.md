@@ -11,7 +11,7 @@ is the "HyperFrames Studio Pack plan" doc.
 | 3 Fixes + color   | planned | stabilise, slow-motion, denoise, auto-correct, shot matching                                          |
 | 4 Motion blocks   | planned | audio-reactive, Lottie, picture-in-picture, loop easing                                               |
 | 5 Voice cloning   | planned | local clone of your own voice                                                                         |
-| 6 Footage search  | planned | find clips by what is said or shown                                                                   |
+| 6 Footage search  | done    | index a folder (faster-whisper + CLIP), search spoken or visual, contact sheet, export                |
 | 7 Publishing      | planned | Postiz drafts, Buffer backup, approval per post                                                       |
 
 ## Setup
