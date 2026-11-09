@@ -55,14 +55,25 @@ def check_sample(path: str) -> dict:
         problems.append(f"too short ({seconds:.0f} s): record at least 20 seconds, ideally 30-60")
     if seconds > 180:
         problems.append(f"long ({seconds:.0f} s): only the first minute or so helps; that's fine")
-    if peak > -0.3:
-        problems.append("clipping (the level hit the top): record a little quieter")
+    if _clipped_moments(path) >= 3:
+        problems.append("clipping (the level hit the top several times): record a little quieter")
+    elif peak > -1:
+        problems.append(f"very close to the top (peak {peak:.1f} dB): fine, but a little quieter is safer")
     if float(loud["input_i"]) < -40:
         problems.append(f"very quiet ({float(loud['input_i']):.0f} LUFS): move closer to the mic")
     if noise > -50:
         problems.append(f"noisy room (noise floor {noise:.0f} dB): it will be cleaned, but a quieter room clones better")
     return {"seconds": round(seconds, 1), "lufs": round(float(loud["input_i"]), 1), "peak_db": round(peak, 1),
             "noise_floor_db": round(noise, 1), "problems": problems}
+
+
+def _clipped_moments(path: str) -> int:
+    """Separate moments where the waveform sits at full scale (a real clip), not just a loud peak."""
+    import numpy as np
+    pcm = subprocess.run([FFMPEG, "-v", "error", "-i", path, "-ac", "1", "-f", "f32le", "-"], capture_output=True,
+                         check=True).stdout
+    hot = np.abs(np.frombuffer(pcm, np.float32)) >= 0.999
+    return int(np.count_nonzero(np.diff(hot.astype(np.int8)) == 1))
 
 
 def enrol(name: str, sample: str, consent: str) -> Path:
