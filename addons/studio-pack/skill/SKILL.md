@@ -3,7 +3,7 @@ name: studio-pack
 description: Fork add-on with DaVinci Resolve-style finishing tools for HyperFrames projects. Use for voice cleanup (noise, hum, echo), dialogue leveling, beat detection when `hyperframes beats` finds none, snapping cuts to beats, auto-ducking music under voice clips, and exporting one render to YouTube, Shorts, TikTok, Reels and X specs. Use before publishing any video.
 ---
 
-# Studio Pack (batches 1-4: audio, export, reframe, footage fixes, colour, motion blocks)
+# Studio Pack (batches 1-5: audio, export, reframe, footage fixes, colour, motion blocks, voice)
 
 Tools live in the fork at `addons/studio-pack/tools/`. Run them with the shared environment:
 
@@ -131,6 +131,36 @@ $PY $PACK/studio_motion.py add studio-loops --project .
   Never use `repeat: -1` in a HyperFrames timeline: it makes the timeline endless; this adds finite repeats.
 - These blocks don't appear in Studio's Catalog tab (that needs changes to HyperFrames' code); Claude installs them.
 - After mounting: `npx hyperframes check`, then snapshot the frames where the blocks are on screen.
+
+## Voice: the user's own cloned voice
+
+```bash
+$PY $PACK/studio_voice.py record                                    # interactive: level test, then record (user runs it)
+$PY $PACK/studio_voice.py record --list                             # microphones (the Rode shows as "Jack Mic")
+$PY $PACK/studio_voice.py check recording.m4a                       # level, clipping, noise, length
+$PY $PACK/studio_voice.py enrol ali recording.m4a --consent "This is my own voice"
+$PY $PACK/studio_voice.py say ali "A pullback is not a reversal." line.wav
+$PY $PACK/studio_voice.py script ali script.txt --out-dir assets/vo/ali   # one file per paragraph + manifest.json
+$PY $PACK/studio_voice.py script kokoro script.txt --out-dir assets/vo/stock --kokoro-voice bm_george
+```
+
+- Only the user's own voice, or a voice whose owner agreed in writing. `enrol` requires `--consent`, stored with
+  the voice; never enrol a voice from a video, a public figure or anyone else on the user's say-so alone.
+- Kokoro stays the default for videos unless the user asks for their own voice.
+- The user records with the "Record voice sample" shortcut on their Desktop (it opens the script and runs
+  `record`, which saves to Desktop/video-pipeline/recordings/). Their Rode plugs into the jack and appears as
+  "Jack Mic (Realtek(R) Audio)".
+- Speed: about real time with the laptop on mains power. On battery the GPU is capped near 300 MHz and each
+  second of speech takes ~14 s: check `nvidia-smi` clocks and ask the user to plug in before a long script.
+- Chatterbox runs locally on the GPU (in `~/video-pipeline/.voice-venv`) and adds an inaudible watermark.
+  `--exaggeration` 0.25-1 sets expressiveness (0.5 default; 0.7 for energetic hooks), `--cfg` 0.3-0.7 sets pace
+  (lower = slower, steadier). Same text and settings give the same take.
+- Lines come out trimmed, 48 kHz, -16 LUFS: ready for `studio_audio.py duck` and the platform export.
+  `manifest.json` lists each line's duration for laying out `data-start` / `data-duration`.
+- Check a cloned line before using it: transcribe it (faster-whisper) and compare with the text; regenerate any
+  line with skipped or garbled words (change `--cfg` slightly to get a different take).
+- ElevenLabs (paid): `--engine elevenlabs` only when the user has set `ELEVENLABS_API_KEY` and
+  `ELEVENLABS_VOICE_ID` (a voice they made in their ElevenLabs account). This tool never uploads a voice sample.
 
 ## Export for platforms (after the final render)
 

@@ -56,6 +56,15 @@ uv pip install --python ~/video-pipeline/.ai-venv/Scripts/python.exe realesrgan-
 # ~/video-pipeline/.ai-venv/Lib/site-packages/rife_ncnn_vulkan_python/models/rife-v4.6/
 ```
 
+Batch 5's voice cloning runs in its own environment (Chatterbox pins PyTorch 2.6 and NumPy 1); the model
+(about 3 GB) downloads from Hugging Face on first use:
+
+```bash
+UV_PYTHON_INSTALL_DIR=~/video-pipeline/.python uv venv --python 3.11 ~/video-pipeline/.voice-venv
+uv pip install --python ~/video-pipeline/.voice-venv/Scripts/python.exe torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+uv pip install --python ~/video-pipeline/.voice-venv/Scripts/python.exe chatterbox-tts resemblyzer soundfile
+```
+
 Keep OpenCV below 5 (Real-ESRGAN's package pulls in the newest, and OpenCV 5 dropped the face detector reframe
 falls back on).
 
