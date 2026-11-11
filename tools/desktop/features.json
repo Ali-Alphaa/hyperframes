@@ -5,11 +5,11 @@
       "group": "HyperFrames",
       "name": "Studio (edit and preview a project)",
       "bullets": [
-        "Opens a project in its own window with a timeline and live preview",
-        "Scrub, play and check every scene before rendering",
-        "Opened from the 'HyperFrames Fork' desktop shortcut"
+        "Double-click 'HyperFrames' on the Desktop: it opens on a list of your projects",
+        "Search or click a project to open it in Studio, in the same window",
+        "Alt+Left in Studio goes back to the list; scrub, play and check scenes before rendering"
       ],
-      "ask": "open my project in Studio"
+      "ask": "double-click 'HyperFrames' on the Desktop"
     },
     {
       "group": "HyperFrames",

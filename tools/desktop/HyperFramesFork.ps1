@@ -1,6 +1,7 @@
 # Opens this fork's HyperFrames Studio in its own desktop window.
-# Usage: HyperFramesFork.ps1 [project folder]. With no folder it shows the Windows Explorer Open window.
-param([string]$Project)
+# Usage: HyperFramesFork.ps1 [project folder]. With no folder it opens the HyperFrames home screen, which lists
+# the projects; -Pick shows the Windows Explorer Open window instead.
+param([string]$Project, [switch]$Pick)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -99,6 +100,43 @@ function Select-Project {
     return $null
 }
 
+# Opens an app window in the browser's normal profile and returns once the user closes it. (A separate, fresh
+# profile played Studio's preview without sound on this PC, while the normal profile plays it with sound.)
+function Wait-AppWindow([string]$url) {
+    $before = Get-StudioWindows
+    Start-Process -FilePath $browser -ArgumentList @("--new-window", "--app=$url", '--window-size=1500,950')
+    # The browser hands the window to its running process, so wait for the window itself: the new
+    # window titled exactly like the page (normal tabs end in "- Google Chrome"), then until it closes.
+    $mine = $null
+    for ($i = 0; $i -lt 120 -and -not $mine; $i++) {
+        Start-Sleep -Milliseconds 500
+        $mine = Get-StudioWindows | Where-Object { $before -notcontains $_ } | Select-Object -First 1
+    }
+    if (-not $mine) { Fail "The Studio window didn't open." }
+    while ([HfFork.Win]::IsWindow([IntPtr]$mine)) { Start-Sleep -Seconds 2 }
+}
+
+# No project given: open the HyperFrames home screen (project-home.mjs), a page in the same window that lists
+# the projects; picking one starts its Studio there. -Pick shows the Explorer "Open" window instead.
+if (-not $Project -and -not $Pick) {
+    $info = New-Object System.Diagnostics.ProcessStartInfo -Property @{
+        FileName = (Get-Command node).Source; Arguments = "`"$(Join-Path $PSScriptRoot 'project-home.mjs')`""
+        UseShellExecute = $false; RedirectStandardOutput = $true; CreateNoWindow = $true
+    }
+    $homeProc = [System.Diagnostics.Process]::Start($info)
+    try {
+        $line = $homeProc.StandardOutput.ReadLine()
+        if (-not $line) { Fail "The HyperFrames home screen didn't start." }
+        $homeUrl = ($line | ConvertFrom-Json).url
+        Wait-AppWindow $homeUrl
+    } finally {
+        # Stops the Studio server the home screen started, then the home screen itself.
+        try { Invoke-RestMethod -Method Post -Uri "${homeUrl}shutdown" -TimeoutSec 20 | Out-Null } catch {}
+        if (-not $homeProc.HasExited) { & taskkill.exe /PID $homeProc.Id /T /F 2>&1 | Out-Null }
+    }
+    exit 0
+}
+
 if (-not $Project) {
     $Project = Select-Project
     if (-not $Project) { exit 0 }
@@ -126,22 +164,7 @@ try {
     $json = $output.Substring($output.IndexOf('{')) | ConvertFrom-Json
     if (-not $json.ok) { Fail "The Studio didn't start:`n$output" }
     $serverPid = $json.result.pid
-    $url = "http://$($json.result.host):$($json.result.port)/"
-
-    # Open an app window in the browser's normal profile. A separate, fresh profile played Studio's
-    # preview without sound on this PC, while the normal profile plays it with sound.
-    $before = Get-StudioWindows
-    Start-Process -FilePath $browser -ArgumentList @("--new-window", "--app=$url", '--window-size=1500,950')
-
-    # The browser hands the window to its running process, so wait for the window itself: the new
-    # window titled exactly like the page (normal tabs end in "- Google Chrome"), then until it closes.
-    $mine = $null
-    for ($i = 0; $i -lt 120 -and -not $mine; $i++) {
-        Start-Sleep -Milliseconds 500
-        $mine = Get-StudioWindows | Where-Object { $before -notcontains $_ } | Select-Object -First 1
-    }
-    if (-not $mine) { Fail "The Studio window didn't open." }
-    while ([HfFork.Win]::IsWindow([IntPtr]$mine)) { Start-Sleep -Seconds 2 }
+    Wait-AppWindow "http://$($json.result.host):$($json.result.port)/"
 } catch {
     Fail "The Studio didn't start:`n$_"
 } finally {

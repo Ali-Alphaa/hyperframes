@@ -40,13 +40,19 @@ window closes. `tools/desktop/install-shortcut.ps1` puts a "HyperFrames Fork" sh
 Chrome or Edge, and it runs the built files, so run `bun run build` after any code change or merge.
 
 The window opens in your normal browser profile. A separate, fresh profile played the preview without sound on this PC.
-To pick a project it shows the standard Windows Explorer Open window: go into the project folder and open its
-`index.html`. `install-shortcut.ps1 -Project <folder> -Name <name>` makes a shortcut that opens one project directly.
+With `-Pick` it shows the standard Windows Explorer Open window instead of the home screen (below): go into the
+project folder and open its `index.html`. `install-shortcut.ps1 -Project <folder> -Name <name>` makes a shortcut that opens one project directly.
 
 When its window closes, the launcher stops only the server it started. (`preview --stop` stops every Studio for the
 project, so it used to kill the server behind another open window.) Only one Studio runs per project: opening the
 project again replaces the earlier server. Shortcuts start the launcher through `conhost --headless`, because Windows
 Terminal shows a window for it that kills the launcher when closed.
+
+With no project, the launcher opens a HyperFrames home screen in the Studio window (`project-home.mjs` and
+`project-home.html`): recent and found projects (from the `videos` folders), a search box and "Other folder…" for the
+Explorer window. Picking one starts its Studio and the window moves on to it; Alt+Left comes back to the list, and
+opening another project stops the previous server. `HyperFramesFork.ps1 -Pick` keeps the old Explorer-first start.
+`install-shortcut.ps1 -Name HyperFrames` makes the shortcut.
 
 `install-shortcut.ps1 -Features` adds a "HyperFrames Features" shortcut: a window with a dropdown of every feature
 (HyperFrames, Studio Pack, add-ons, research), what each does and what to ask Claude, with a button that copies the
