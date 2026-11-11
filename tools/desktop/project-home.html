@@ -26,6 +26,7 @@
   .btn:hover { border-color: var(--dim); }
   .btn.small { padding: 4px 10px; font-size: 12px; }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn:disabled { opacity: .4; cursor: default; }
   .tools { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
   .tools input { width: 280px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
@@ -50,6 +51,30 @@
   .guide { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
   .guide .card p { margin: 6px 0 0; color: #c6cad6; }
   code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  #picker { position: fixed; inset: 0; background: rgba(5,6,8,.7); display: none; align-items: flex-start; justify-content: center;
+    padding-top: 6vh; z-index: 5; }
+  #picker.on { display: flex; }
+  .pick { width: min(820px, 94vw); max-height: 84vh; display: flex; flex-direction: column; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .pick-head { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); }
+  .pick-head h3 { margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
+  .addr { display: flex; gap: 8px; }
+  .addr input { flex: 1; font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .chips button { background: var(--bg); border: 1px solid var(--line); color: var(--dim); border-radius: 999px; padding: 3px 11px;
+    font: inherit; font-size: 12px; cursor: pointer; }
+  .chips button:hover { color: var(--text); border-color: var(--dim); }
+  .folders { overflow: auto; padding: 6px 8px; flex: 1; min-height: 200px; }
+  .folder { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: var(--text);
+    font: inherit; text-align: left; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+  .folder:hover, .folder:focus-visible { background: var(--panel2); outline: none; }
+  .folder .icon { width: 18px; text-align: center; color: var(--dim); }
+  .folder.project .icon { color: var(--accent); }
+  .folder .label { flex: 1; word-break: break-all; }
+  .folder .badge { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; }
+  .pick-foot { display: flex; gap: 10px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--line); }
+  .pick-foot .msg { flex: 1; color: var(--dim); font-size: 12px; }
+  .pick-foot .msg.bad { color: #ffb4b9; }
   #busy { position: fixed; inset: 0; background: rgba(13,14,17,.88); display: none; align-items: center; justify-content: center;
     flex-direction: column; gap: 14px; font-size: 15px; }
   #busy.on { display: flex; }
@@ -79,8 +104,8 @@
 
   <section id="projects">
     <div class="tools">
-      <input id="q" placeholder="Search projects" autofocus>
-      <button class="btn" id="other">Other folder…</button>
+      <input id="q" placeholder="Search projects, or paste a folder address" autofocus>
+      <button class="btn" id="other">Browse folders…</button>
     </div>
     <div id="list"></div>
     <p class="hint">Tip: press Alt+← in Studio to come back here and open another project.</p>
@@ -122,6 +147,24 @@
     <div class="panel"><table id="places"></table></div>
   </section>
 </main>
+<div id="picker" role="dialog" aria-modal="true">
+  <div class="pick">
+    <div class="pick-head">
+      <h3><span id="pickTitle">Open a project</span><button class="btn small" id="pickClose">Close</button></h3>
+      <div class="addr">
+        <button class="btn" id="pickUp" title="Up one folder">↑</button>
+        <input id="pickPath" placeholder="Type or paste a folder address, e.g. C:\Users\you\Videos\my-project" spellcheck="false">
+        <button class="btn" id="pickGo">Go</button>
+      </div>
+      <div class="chips" id="pickPlaces"></div>
+    </div>
+    <div class="folders" id="pickList"></div>
+    <div class="pick-foot">
+      <span class="msg" id="pickMsg"></span>
+      <button class="btn primary" id="pickAction">Open this project</button>
+    </div>
+  </div>
+</div>
 <div id="busy"><div class="spin"></div><div id="busyText">Opening…</div></div>
 <div id="toast"></div>
 <script>
@@ -178,16 +221,16 @@
     const rest = shown.filter((p) => p.recent < 0).sort((a, b) => b.edited - a.edited);
     section(list, "Recent", recent, projectCard);
     section(list, recent.length ? "All projects" : "Projects", rest, projectCard);
-    if (!shown.length) list.append(el("div", "empty", `No projects found${term ? ` for “${$("q").value}”` : ""}. Use “Other folder…”, or add a folder in Settings.`));
+    if (!shown.length) list.append(el("div", "empty", `No projects found${term ? ` for “${$("q").value}”` : ""}. Use “Browse folders…”, paste a folder address, or add a folder in Settings.`));
   }
 
   async function open(path, body, name) {
     showError("");
-    $("busyText").textContent = name ? `Opening ${name}…` : "Choose a project in the Explorer window…";
+    $("busyText").textContent = `Opening ${name || "project"}…`;
     $("busy").classList.add("on");
     try {
       const data = await post(path, body);
-      if (data.url) { location.href = data.url; return; }
+      if (data.url) { hidePicker(); location.href = data.url; return; }
       if (!data.cancelled) throw new Error(data.error || "Studio didn't start.");
     } catch (e) {
       showError(e.message);
@@ -195,9 +238,86 @@
     $("busy").classList.remove("on");
   }
 
-  $("other").onclick = () => open("/browse");
+  // Folder browser: mode "open" opens a project, mode "add" adds a folder to scan (Settings).
+  const looksLikePath = (t) => /^\s*["']?([a-z]:[\\/]?|\\\\|~[\\/]?|%\w+%|file:\/)/i.test(t);
+  let pickMode = "open", pickCurrent = null;
+
+  function pickMessage(text, bad) { $("pickMsg").textContent = text || ""; $("pickMsg").className = "msg" + (bad ? " bad" : ""); }
+
+  function folderRow(f) {
+    const b = el("button", "folder" + (f.project ? " project" : ""));
+    b.append(el("span", "icon", f.project ? "▶" : "📁"), el("span", "label", f.name));
+    if (f.project) b.append(el("span", "badge", "project"));
+    b.title = f.path;
+    b.onclick = () => (f.project && pickMode === "open" ? open("/open", { dir: f.path }, f.name) : goTo(f.path));
+    return b;
+  }
+
+  async function goTo(path) {
+    const d = await post("/dir", { path });
+    const chips = $("pickPlaces");
+    chips.innerHTML = "";
+    (d.places || []).forEach((pl) => { const c = el("button", null, pl.name); c.title = pl.path; c.onclick = () => goTo(pl.path); chips.append(c); });
+    if (d.error) { pickMessage(d.error, true); return; }
+    pickCurrent = d;
+    $("pickPath").value = d.path;
+    $("pickUp").disabled = d.parent == null;
+    const list = $("pickList");
+    list.innerHTML = "";
+    if (!d.path) list.append(el("div", "empty", "Choose a place above, or type a folder address."));
+    else if (!d.folders.length) list.append(el("div", "empty", d.project ? "This is a project folder." : "No folders here."));
+    d.folders.forEach((f) => list.append(folderRow(f)));
+    const action = $("pickAction");
+    if (pickMode === "open") {
+      action.textContent = "Open this project";
+      action.disabled = !d.project;
+      pickMessage(d.project ? "This folder is a HyperFrames project." :
+        d.folders.some((f) => f.project) ? "Projects are marked ▶ — click one to open it." : "A project folder has index.html and hyperframes.json.");
+    } else {
+      action.textContent = "Add this folder";
+      action.disabled = !d.path;
+      pickMessage(d.path ? `Projects inside ${d.path} will show on the Projects tab.` : "");
+    }
+  }
+
+  async function showPicker(mode, path) {
+    pickMode = mode;
+    $("pickTitle").textContent = mode === "open" ? "Open a project" : "Add a folder to scan for projects";
+    $("picker").classList.add("on");
+    await goTo(path ?? localStorage.getItem("hf-last-folder") ?? "");
+    $("pickPath").focus();
+    $("pickPath").select();
+  }
+  const hidePicker = () => { $("picker").classList.remove("on"); if (pickCurrent?.path) localStorage.setItem("hf-last-folder", pickCurrent.path); };
+
+  $("pickAction").onclick = async () => {
+    if (!pickCurrent?.path) return;
+    localStorage.setItem("hf-last-folder", pickCurrent.path);
+    if (pickMode === "open") return open("/open", { dir: pickCurrent.path }, pickCurrent.path.split(/[\\/]/).pop());
+    const r = await post("/settings/add-folder", { path: pickCurrent.path });
+    if (r.error) return pickMessage(r.error, true);
+    hidePicker();
+    renderSettings(r);
+    loadProjects();
+  };
+  $("pickGo").onclick = () => goTo($("pickPath").value);
+  $("pickPath").onkeydown = (e) => { if (e.key === "Enter") goTo($("pickPath").value); };
+  $("pickUp").onclick = () => pickCurrent && goTo(pickCurrent.parent ?? "");
+  $("pickClose").onclick = hidePicker;
+  $("picker").onclick = (e) => { if (e.target === $("picker")) hidePicker(); };
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("picker").classList.contains("on")) hidePicker(); });
+  $("other").onclick = () => showPicker("open");
   $("q").oninput = renderProjects;
-  $("q").onkeydown = (e) => { if (e.key === "Enter") $("list").querySelector(".card")?.click(); };
+  // Enter: a pasted folder address opens that project, or browses to the folder; otherwise the first match opens.
+  $("q").onkeydown = async (e) => {
+    if (e.key !== "Enter") return;
+    const text = $("q").value;
+    if (!looksLikePath(text)) return $("list").querySelector(".card")?.click();
+    const d = await post("/dir", { path: text });
+    if (d.project) return open("/open", { dir: d.path }, d.path.split(/[\\/]/).pop());
+    showPicker("open", d.error ? "" : d.path);
+    if (d.error) pickMessage(d.error, true);
+  };
   const loadProjects = () => fetch("/projects").then((r) => r.json()).then((p) => { projects = p; renderProjects(); });
 
   // Features
@@ -263,7 +383,7 @@
       actions.append(remove);
       roots.append(row([r.path, r.exists ? `${r.projects} project${r.projects === 1 ? "" : "s"}` : "not on this PC", actions]));
     });
-    if (!s.roots.length) roots.append(row(["No folders: only recent projects and “Other folder…” will show."]));
+    if (!s.roots.length) roots.append(row(["No folders: only recent projects and “Browse folders…” will show."]));
     const services = $("services");
     services.innerHTML = "";
     s.services.forEach((v) => services.append(row([dot(v.set, v.name), v.use, v.set ? "set" : `not set (${v.key})`])));
@@ -274,7 +394,7 @@
   }
 
   const loadSettings = () => fetch("/settings").then((r) => r.json()).then(renderSettings);
-  $("addRoot").onclick = async () => { renderSettings(await post("/settings/add-folder")); loadProjects(); };
+  $("addRoot").onclick = () => showPicker("add");
   $("resetRoots").onclick = async () => { renderSettings(await post("/settings/reset-folders")); loadProjects(); };
   $("clearRecent").onclick = async () => { renderSettings(await post("/settings/clear-recent")); loadProjects(); };
 

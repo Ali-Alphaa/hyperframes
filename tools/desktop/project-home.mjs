@@ -74,18 +74,6 @@ function settingsView() {
   };
 }
 
-// The Windows folder picker, for adding a folder to scan for projects.
-function pickFolder() {
-  const script = `Add-Type -AssemblyName System.Windows.Forms
-$o = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; Opacity = 0 }; $o.Show()
-$d = New-Object System.Windows.Forms.FolderBrowserDialog
-$d.Description = 'Choose a folder that holds HyperFrames projects'
-if ($d.ShowDialog($o) -eq 'OK') { $d.SelectedPath }`;
-  return spawnSync("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
-    encoding: "utf8",
-  }).stdout.trim();
-}
-
 const isProject = (dir) =>
   existsSync(join(dir, "index.html")) && existsSync(join(dir, "hyperframes.json"));
 
@@ -166,18 +154,71 @@ function startStudio(dir) {
   return `http://${json.result.host}:${json.result.port}/`;
 }
 
-// The Windows Explorer "Open" window, for a project that isn't in the list.
-function browse() {
-  const script = `Add-Type -AssemblyName System.Windows.Forms
-$o = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; Opacity = 0 }; $o.Show()
-$d = New-Object System.Windows.Forms.OpenFileDialog
-$d.Title = 'Open a HyperFrames project (choose its index.html)'
-$d.Filter = 'HyperFrames project (index.html, hyperframes.json)|index.html;hyperframes.json'
-if ($d.ShowDialog($o) -eq 'OK') { Split-Path -Parent $d.FileName }`;
-  const out = spawnSync("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
-    encoding: "utf8",
-  });
-  return out.stdout.trim();
+// Folder browsing for the page's own folder browser and address bar. (A Windows Explorer dialog started from this
+// background process opened hidden behind the app window, because Windows doesn't let it take the foreground.)
+function drives() {
+  const found = [];
+  for (const letter of "CDEFGHIJKLMNOPQRSTUVWXYZ")
+    if (existsSync(`${letter}:\\`)) found.push(`${letter}:\\`);
+  return found;
+}
+
+function places() {
+  const list = [
+    { name: "Desktop", path: desktop },
+    { name: "Videos folders", path: roots().find((r) => existsSync(r)) },
+    { name: "Home", path: homedir() },
+  ];
+  return [
+    ...list.filter((p) => p.path && existsSync(p.path)),
+    ...drives().map((d) => ({ name: d.slice(0, 2), path: d })),
+  ];
+}
+
+// Turns what the user typed into a folder: quotes and file:/// removed, ~ and %VARS% expanded, a file means its folder.
+function cleanPath(input) {
+  let p = String(input ?? "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+  if (/^file:\/\//i.test(p)) p = decodeURIComponent(p.replace(/^file:\/\/\/?/i, ""));
+  p = p.replace(/%([^%]+)%/g, (m, v) => process.env[v] ?? m);
+  if (p === "~" || p.startsWith("~\\") || p.startsWith("~/")) p = homedir() + p.slice(1);
+  if (/^[a-z]:$/i.test(p)) p += "\\";
+  if (!p) return "";
+  p = resolve(p);
+  if (existsSync(p) && !statSync(p).isDirectory()) p = dirname(p);
+  return p;
+}
+
+function listDir(input) {
+  const path = cleanPath(input);
+  if (!path) return { path: "", parent: null, project: false, folders: [], places: places() };
+  if (!existsSync(path)) return { error: `Couldn't find ${path}`, places: places() };
+  let entries;
+  try {
+    entries = readdirSync(path, { withFileTypes: true });
+  } catch {
+    return { error: `Couldn't open ${path} (no access)`, places: places() };
+  }
+  const folders = entries
+    .filter(
+      (e) =>
+        e.isDirectory() &&
+        !e.name.startsWith(".") &&
+        !/^\$|^System Volume Information$/i.test(e.name),
+    )
+    .map((e) => ({
+      name: e.name,
+      path: join(path, e.name),
+      project: isProject(join(path, e.name)),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.project) - Number(a.project) ||
+        a.name.localeCompare(b.name, undefined, { numeric: true }),
+    );
+  const parent = dirname(path) === path ? "" : dirname(path);
+  return { path, parent, project: isProject(path), folders, places: places() };
 }
 
 const send = (res, code, body, type = "application/json") => {
@@ -207,8 +248,9 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, readFileSync(join(here, "features.json"), "utf8"));
     if (req.method === "GET" && req.url === "/settings") return send(res, 200, settingsView());
     if (req.method === "POST" && req.url === "/settings/add-folder") {
-      const dir = pickFolder();
-      if (dir && !roots().some((r) => r.toLowerCase() === dir.toLowerCase()))
+      const dir = cleanPath((await readBody(req)).path);
+      if (!dir || !existsSync(dir)) return send(res, 400, { error: "That folder doesn't exist." });
+      if (!roots().some((r) => r.toLowerCase() === dir.toLowerCase()))
         writeSettings({ ...readSettings(), roots: [...roots(), dir] });
       return send(res, 200, settingsView());
     }
@@ -239,7 +281,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     if (req.method === "POST" && req.url === "/open") {
-      const { dir } = await readBody(req);
+      const dir = cleanPath((await readBody(req)).dir);
       if (!dir || !isProject(dir))
         return send(res, 400, {
           error:
@@ -247,15 +289,9 @@ const server = http.createServer(async (req, res) => {
         });
       return send(res, 200, { url: startStudio(dir) });
     }
-    if (req.method === "POST" && req.url === "/browse") {
-      const dir = browse();
-      if (!dir) return send(res, 200, { cancelled: true });
-      if (!isProject(dir))
-        return send(res, 400, {
-          error:
-            "That folder isn't a HyperFrames project (it needs index.html and hyperframes.json).",
-        });
-      return send(res, 200, { url: startStudio(dir) });
+    if (req.method === "POST" && req.url === "/dir") {
+      const { path } = await readBody(req);
+      return send(res, 200, listDir(path));
     }
     if (req.method === "POST" && req.url === "/shutdown") {
       for (const pid of [...servers]) stopServer(pid);
