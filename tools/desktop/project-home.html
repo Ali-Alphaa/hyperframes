@@ -32,6 +32,9 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; text-align: left;
     color: inherit; font: inherit; }
+  .card-wrap { position: relative; display: grid; }
+  .card-wrap .present { position: absolute; top: 12px; right: 12px; background: var(--panel2); }
+  .card-wrap .present:hover { border-color: var(--accent); color: #fff; }
   button.card { cursor: pointer; transition: border-color .12s, transform .12s; }
   button.card:hover, button.card:focus-visible { border-color: var(--accent); outline: none; transform: translateY(-1px); }
   .name { font-size: 15px; font-weight: 600; margin-bottom: 4px; word-break: break-word; }
@@ -199,10 +202,18 @@
   };
 
   function projectCard(p) {
+    const wrap = el("div", "card-wrap");
     const b = el("button", "card");
     b.append(el("div", "name", p.name), el("div", "meta", ago(p.edited)), el("div", "meta", p.folder));
     b.onclick = () => open("/open", { dir: p.dir }, p.name);
-    return b;
+    wrap.append(b);
+    if (p.deck) {
+      const present = el("button", "btn small present", "▶ Present");
+      present.title = "Present this slide deck (presenter view; press P for the audience window)";
+      present.onclick = () => open("/present", { dir: p.dir }, `${p.name} presentation`);
+      wrap.append(present);
+    }
+    return wrap;
   }
 
   function section(parent, title, items, make) {

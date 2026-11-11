@@ -54,7 +54,9 @@ file address (Enter opens that project), and "Browse folders…": an in-window f
 quick places and drives, projects marked. (A Windows Explorer dialog started by the background home server opened
 hidden behind the app window, so the page never uses one.) Features: every entry in `features.json` with a copy button for its Claude request. Settings: where
 things are in Studio, the folders scanned for projects (add, remove, reset; saved in
-`%LOCALAPPDATA%\HyperFramesFork\settings.json`), and whether each add-on's key is set (never its value). Picking one starts its Studio and the window moves on to it; Alt+Left comes back to the list, and
+`%LOCALAPPDATA%\HyperFramesFork\settings.json`), and whether each add-on's key is set (never its value). Slide decks (an index.html with a slideshow island) also get a "▶ Present" button, which runs this fork's
+`present` (`npx hyperframes present` would run HeyGen's published package and miss the fork's slideshow changes).
+Picking one starts its Studio and the window moves on to it; Alt+Left comes back to the list, and
 opening another project stops the previous server. `HyperFramesFork.ps1 -Pick` keeps the old Explorer-first start.
 `install-shortcut.ps1 -Name HyperFrames` makes the shortcut.
 

@@ -3,7 +3,7 @@
 // HyperFrames home screen: a local page with the user's projects, every feature (features.json) and settings.
 // Clicking a project starts its Studio server and the page moves on to it, so Studio opens without a file dialog.
 // Run by HyperFramesFork.ps1: prints {"url": ...} on its first line, stops its Studio servers on POST /shutdown.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import http from "node:http";
 import { homedir } from "node:os";
@@ -112,7 +112,13 @@ function findProjects() {
   const add = (dir) => {
     const key = dir.toLowerCase();
     if (!seen.has(key) && isProject(dir))
-      seen.set(key, { dir, name: basename(dir), folder: dirname(dir), edited: edited(dir) });
+      seen.set(key, {
+        dir,
+        name: basename(dir),
+        folder: dirname(dir),
+        edited: edited(dir),
+        deck: isDeck(dir),
+      });
   };
   readRecent().forEach(add);
   for (const root of roots()) {
@@ -129,6 +135,56 @@ function findProjects() {
   }
   const recent = readRecent().map((d) => d.toLowerCase());
   return [...seen.values()].map((p) => ({ ...p, recent: recent.indexOf(p.dir.toLowerCase()) }));
+}
+
+const ANSI_COLOUR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
+// A slide deck: its index.html carries a slideshow island, so `present` can show it.
+function isDeck(dir) {
+  try {
+    return readFileSync(join(dir, "index.html"), "utf8").includes(
+      "application/hyperframes-slideshow+json",
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Presents a deck with THIS fork's `present` (not `npx hyperframes present`, which runs HeyGen's published package
+// and so misses the fork's slideshow changes). Resolves with the presenter page's address.
+function startPresent(dir) {
+  return new Promise((ok, fail) => {
+    const child = spawn(process.execPath, [cli, "present", dir, "--no-open"], {
+      cwd: dir,
+      env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let out = "";
+    let started = false;
+    const timer = setTimeout(
+      () => fail(new Error(`The presentation didn't start:\n${out.slice(-1500)}`)),
+      60000,
+    );
+    const read = (chunk) => {
+      out += String(chunk).replace(ANSI_COLOUR, ""); // in case colours come through anyway
+      const url = out.match(/Present\s+(http:\/\/\S+)/)?.[1];
+      if (!url || started) return; // later output still contains the address: act on it once
+      started = true;
+      clearTimeout(timer);
+      for (const pid of [...servers]) stopServer(pid); // one project at a time in this window
+      servers.add(child.pid);
+      remember(dir);
+      ok(url);
+    };
+    child.stdout.on("data", read);
+    child.stderr.on("data", read);
+    child.on("exit", () => {
+      clearTimeout(timer);
+      servers.delete(child.pid);
+      fail(new Error(`The presentation stopped:\n${out.slice(-1500)}`));
+    });
+  });
 }
 
 function stopServer(pid) {
@@ -281,6 +337,11 @@ const server = http.createServer(async (req, res) => {
       ];
       if (known.includes(path) && existsSync(path)) spawnSync("explorer.exe", [path]);
       return send(res, 200, { ok: true });
+    }
+    if (req.method === "POST" && req.url === "/present") {
+      const dir = cleanPath((await readBody(req)).dir);
+      if (!dir || !isDeck(dir)) return send(res, 400, { error: "That folder isn't a slide deck." });
+      return send(res, 200, { url: await startPresent(dir) });
     }
     if (req.method === "POST" && req.url === "/open") {
       const dir = cleanPath((await readBody(req)).dir);
