@@ -48,6 +48,10 @@ project, so it used to kill the server behind another open window.) Only one Stu
 project again replaces the earlier server. Shortcuts start the launcher through `conhost --headless`, because Windows
 Terminal shows a window for it that kills the launcher when closed.
 
+`install-shortcut.ps1 -Features` adds a "HyperFrames Features" shortcut: a window with a dropdown of every feature
+(HyperFrames, Studio Pack, add-ons, research), what each does and what to ask Claude, with a button that copies the
+request. The list is `tools/desktop/features.json`; add a row there when a feature is added.
+
 ## Catalog thumbnails
 
 HeyGen hosts preview images for only some catalog items, and Studio shows a plain category tile for the rest. This fork
