@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mediaElementTime } from "@hyperframes/core/runtime/media-clock";
 import { handleRuntimeMessage } from "../runtime-message-handler.js";
 import {
+  AUDIENCE_CHROME_IDLE_MS,
   childrenMayStillArrive,
   dropInvalidSlides,
   HyperframesSlideshow,
@@ -815,6 +816,110 @@ describe("<hyperframes-slideshow> presenter mode", () => {
     expect(getLastSync()).toEqual({ sequenceId: "main", slideIndex: 2, fragmentIndex: 0 });
     presenterChannel.close();
     el.remove();
+  });
+
+  it("audience mode: arrow keys and clicker keys ask the presenter to move instead of moving locally", async () => {
+    const listener = new BroadcastChannel(slideshowChannelName());
+    const seen: unknown[] = [];
+    listener.onmessage = (e) => seen.push(e.data);
+    const { el } = makeAudienceEl();
+    const next = vi.fn();
+    el.controller.next = next;
+    await tick();
+
+    for (const key of ["ArrowRight", "PageDown", "ArrowLeft", "PageUp"]) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key, cancelable: true }));
+    }
+    await tick();
+
+    expect(seen).toEqual([
+      { type: "nav", direction: "next" },
+      { type: "nav", direction: "next" },
+      { type: "nav", direction: "prev" },
+      { type: "nav", direction: "prev" },
+    ]);
+    expect(next).not.toHaveBeenCalled();
+    listener.close();
+    el.remove();
+  });
+
+  it("presenter mode: moves when the audience window asks", async () => {
+    const audience = new BroadcastChannel(slideshowChannelName());
+    const { el } = makePresenterEl();
+    const next = vi.fn();
+    const prev = vi.fn();
+    el.controller.next = next;
+    el.controller.prev = prev;
+    await tick();
+
+    audience.postMessage({ type: "nav", direction: "next" });
+    audience.postMessage({ type: "nav", direction: "prev" });
+    audience.postMessage({ type: "nav", direction: "sideways" });
+    await tick();
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(prev).toHaveBeenCalledTimes(1);
+    audience.close();
+    el.remove();
+  });
+
+  it("presenter mode: PageDown/PageUp move the deck; Alt+Left is left to the browser", async () => {
+    const { el } = makePresenterEl();
+    const next = vi.fn();
+    const prev = vi.fn();
+    el.controller.next = next;
+    el.controller.prev = prev;
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", altKey: true }));
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(prev).toHaveBeenCalledTimes(1);
+    el.remove();
+  });
+
+  it("audience mode: the fullscreen control fades out after 3 s without mouse movement", () => {
+    vi.useFakeTimers();
+    try {
+      const { el } = makeAudienceEl();
+      const cluster = () => el.querySelector("[data-hf-nav-cluster]") as HTMLElement;
+      expect(cluster().style.opacity).toBe("1");
+
+      vi.advanceTimersByTime(AUDIENCE_CHROME_IDLE_MS - 100);
+      expect(cluster().style.opacity).toBe("1");
+      vi.advanceTimersByTime(200);
+      expect(cluster().style.opacity).toBe("0");
+      expect(cluster().style.pointerEvents).toBe("none");
+      expect(el.hasAttribute("data-hf-chrome-idle")).toBe(true);
+      expect(el.style.cursor).toBe("none");
+
+      el.dispatchEvent(new Event("pointermove"));
+      expect(cluster().style.opacity).toBe("1");
+      expect(el.style.cursor).toBe("");
+
+      // A repaint (slide change) keeps the hidden state.
+      vi.advanceTimersByTime(AUDIENCE_CHROME_IDLE_MS + 10);
+      el.render();
+      expect(cluster().style.opacity).toBe("0");
+      el.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("presenter mode: the controls never fade", () => {
+    vi.useFakeTimers();
+    try {
+      const { el } = makePresenterEl();
+      vi.advanceTimersByTime(AUDIENCE_CHROME_IDLE_MS * 3);
+      const cluster = el.querySelector("[data-hf-nav-cluster]") as HTMLElement;
+      expect(cluster.style.opacity).not.toBe("0");
+      expect(el.hasAttribute("data-hf-chrome-idle")).toBe(false);
+      el.remove();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("audience mode: mirrors a branch position too (full sequenceId forwarded to syncTo)", async () => {

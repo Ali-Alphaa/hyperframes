@@ -1,3 +1,5 @@
+// fallow-ignore-file unused-file complexity
+// Studio Pack catalog block, loaded by a <script> tag in projects (no importer).
 /* Studio Pack: loop and ping-pong motion for HyperFrames timelines (Resolve 21's loop / ping-pong keyframe modes).
  *
  * HyperFrames drives each timeline's time itself, so `repeat: -1` would make the timeline endless. This adds a

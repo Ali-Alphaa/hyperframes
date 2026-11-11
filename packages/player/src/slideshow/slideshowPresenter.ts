@@ -37,6 +37,14 @@ interface GotoMessage {
   fragmentIndex: number;
 }
 
+/** Audience window -> presenter: arrow keys / clicker pressed in the audience window. The presenter
+ *  moves and posts its new position back, so both windows stay in step. */
+export type NavDirection = "next" | "prev";
+interface NavMessage {
+  type: "nav";
+  direction: NavDirection;
+}
+
 export interface PresenterMediaMessage {
   type: "media";
   sender: "presenter" | "audience";
@@ -53,6 +61,11 @@ export interface PresenterMediaMessage {
 function isRecord(data: unknown): data is Record<string, unknown> {
   if (typeof data !== "object" || data === null) return false;
   return true;
+}
+
+function isNavMessage(data: unknown): data is NavMessage {
+  if (!isRecord(data)) return false;
+  return data["type"] === "nav" && (data["direction"] === "next" || data["direction"] === "prev");
 }
 
 function isGotoMessage(data: unknown): data is GotoMessage {
@@ -117,6 +130,7 @@ export class SlideshowChannel {
     private readonly mode: "presenter" | "audience",
     private readonly onGoto: (msg: GotoMessage) => void,
     private readonly onMedia: (msg: PresenterMediaMessage) => void = () => {},
+    private readonly onNav: (direction: NavDirection) => void = () => {},
   ) {
     try {
       this.channel = new BroadcastChannel(slideshowChannelName());
@@ -132,6 +146,10 @@ export class SlideshowChannel {
         }
         return;
       }
+      if (isNavMessage(e.data)) {
+        if (mode === "presenter") this.onNav(e.data.direction);
+        return;
+      }
       if (isMediaMessage(e.data) && e.data.sender !== mode) {
         this.onMedia(e.data);
       }
@@ -141,6 +159,13 @@ export class SlideshowChannel {
   postPosition(pos: PresenterPosition): void {
     if (this.mode !== "presenter" || !this.channel) return;
     const msg: GotoMessage = { type: "goto", ...pos };
+    this.channel.postMessage(msg);
+  }
+
+  /** Audience only: ask the presenter to move. */
+  postNav(direction: NavDirection): void {
+    if (this.mode !== "audience" || !this.channel) return;
+    const msg: NavMessage = { type: "nav", direction };
     this.channel.postMessage(msg);
   }
 

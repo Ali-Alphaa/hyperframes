@@ -1,3 +1,5 @@
+// fallow-ignore-file unused-file complexity
+// Fork launcher's home-screen server, run directly by HyperFramesFork.ps1 (no importer).
 // HyperFrames home screen: a local page with the user's projects, every feature (features.json) and settings.
 // Clicking a project starts its Studio server and the page moves on to it, so Studio opens without a file dialog.
 // Run by HyperFramesFork.ps1: prints {"url": ...} on its first line, stops its Studio servers on POST /shutdown.

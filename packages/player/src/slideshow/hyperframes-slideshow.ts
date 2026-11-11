@@ -201,6 +201,30 @@ function injectKeyframesOnce(): void {
   document.head.appendChild(style);
 }
 
+// Audience window: the fullscreen control (and the cursor) fade out after this long without mouse movement, so
+// they don't sit on top of the slides; moving the mouse brings them back.
+export const AUDIENCE_CHROME_IDLE_MS = 3000;
+function setClusterHidden(cluster: HTMLElement | null, hide: boolean): void {
+  if (!cluster) return;
+  cluster.style.transition = "opacity 0.5s ease";
+  cluster.style.opacity = hide ? "0" : "1";
+  cluster.style.pointerEvents = hide ? "none" : "auto";
+}
+
+/** The slide iframe draws its own cursor; hide it there too (same-origin decks only). */
+function setFrameCursorHidden(frame: HTMLIFrameElement | null, hide: boolean): void {
+  try {
+    const root = frame?.contentDocument?.documentElement;
+    if (root) root.style.cursor = hide ? "none" : "";
+  } catch {
+    // cross-origin composition: its own cursor stays
+  }
+}
+
+// Keys that move the deck. PageDown/PageUp are what presentation clickers send.
+const NEXT_KEYS = new Set(["ArrowRight", "PageDown"]);
+const PREV_KEYS = new Set(["ArrowLeft", "PageUp"]);
+
 // Fullscreen glyphs (enter = expand corners, exit = collapse corners). Module-level
 // so onFsChange can swap just this glyph without re-rendering the whole chrome.
 const ENTER_FS_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>`;
@@ -235,6 +259,8 @@ export class HyperframesSlideshow extends HTMLElement {
   private audienceMutedPlaybackKeys = new Set<string>();
   private blockedAudienceMedia = new Map<string, PresenterMediaMessage>();
   private audienceMediaUnlockButton: HTMLButtonElement | null = null;
+  private chromeIdle = false;
+  private chromeIdleTimer: ReturnType<typeof setTimeout> | null = null;
   // Bumped whenever autoplay starts or media is stopped (slide change), so a
   // pending re-assert from a previous autoplay can't replay a clip we've left.
   private autoplayToken = 0;
@@ -281,10 +307,14 @@ export class HyperframesSlideshow extends HTMLElement {
     window.addEventListener("keydown", this.onKey);
     this.addEventListener("touchstart", this.onTouchStart, { passive: true });
     this.addEventListener("touchend", this.onTouchEnd);
+    this.addEventListener("pointermove", this.onPointerActivity);
+    this.addEventListener("pointerdown", this.onPointerActivity);
+    this.addEventListener("focusin", this.onPointerActivity);
     window.addEventListener("message", this.onMessage);
     document.addEventListener("fullscreenchange", this.onFsChange);
     this.initChannel();
     this.observeInteractivePlayers();
+    this.onPointerActivity(); // audience: start the idle countdown
     // Defer player-dependent init to a macrotask so that child elements are
     // parsed before we query for <hyperframes-player>. This matters when the
     // bundle is loaded synchronously (e.g. <script src> in <head>), where
@@ -318,6 +348,10 @@ export class HyperframesSlideshow extends HTMLElement {
     this.detachIframeKeys?.();
     this.removeEventListener("touchstart", this.onTouchStart);
     this.removeEventListener("touchend", this.onTouchEnd);
+    this.removeEventListener("pointermove", this.onPointerActivity);
+    this.removeEventListener("pointerdown", this.onPointerActivity);
+    this.removeEventListener("focusin", this.onPointerActivity);
+    this.stopChromeIdleTimer();
     window.removeEventListener("message", this.onMessage);
     document.removeEventListener("fullscreenchange", this.onFsChange);
     this.offChange?.();
@@ -429,6 +463,8 @@ export class HyperframesSlideshow extends HTMLElement {
           // presenter channel does not receive goto messages; posting happens in bindController.
         },
         this.onRemoteMedia,
+        // Arrow keys / clicker pressed in the audience window: move here; the new position syncs back.
+        (direction) => (direction === "next" ? this.controller?.next() : this.controller?.prev()),
       );
     }
   }
@@ -665,9 +701,12 @@ export class HyperframesSlideshow extends HTMLElement {
       try {
         // addEventListener dedupes same handler+target, so re-runs are safe.
         frame.contentWindow?.addEventListener("keydown", this.onKey);
+        frame.contentWindow?.addEventListener("pointermove", this.onPointerActivity);
+        frame.contentWindow?.addEventListener("pointerdown", this.onPointerActivity);
       } catch {
         this.warnIframeKeyForwardingUnavailable();
       }
+      this.applyChromeIdle();
     };
     attach();
     frame.addEventListener("load", attach);
@@ -676,6 +715,8 @@ export class HyperframesSlideshow extends HTMLElement {
       frame.removeEventListener("load", attach);
       try {
         frame.contentWindow?.removeEventListener("keydown", this.onKey);
+        frame.contentWindow?.removeEventListener("pointermove", this.onPointerActivity);
+        frame.contentWindow?.removeEventListener("pointerdown", this.onPointerActivity);
       } catch {
         this.warnIframeKeyForwardingUnavailable();
       }
@@ -889,12 +930,22 @@ export class HyperframesSlideshow extends HTMLElement {
       e.preventDefault();
       return;
     }
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // leave browser shortcuts (Alt+Left = back) alone
+    const direction = NEXT_KEYS.has(e.key) ? "next" : PREV_KEYS.has(e.key) ? "prev" : null;
+    if (direction && this.resolveMode() === "audience") {
+      // The audience window follows the presenter, so ask the presenter to move (it posts the new
+      // position back). Moving only this window would be undone by the presenter's next sync.
+      if (!ambient) return;
+      this.channel?.postNav(direction);
+      e.preventDefault();
+      return;
+    }
     if (!this.controller) return;
-    if (e.key === "ArrowRight") {
+    if (direction === "next") {
       if (!ambient) return;
       this.controller.next();
       e.preventDefault();
-    } else if (e.key === "ArrowLeft") {
+    } else if (direction === "prev") {
       if (!ambient) return;
       this.controller.prev();
       e.preventDefault();
@@ -1009,6 +1060,39 @@ export class HyperframesSlideshow extends HTMLElement {
     this.chrome.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:10;";
     this.chrome.innerHTML = html;
     this.wireChromeButtons();
+    this.applyChromeIdle();
+  }
+
+  /** Audience window: any mouse movement shows the fullscreen control and cursor, and restarts the
+   *  countdown that fades them out after AUDIENCE_CHROME_IDLE_MS. */
+  private onPointerActivity = (): void => {
+    if (this.resolveMode() !== "audience") return;
+    this.stopChromeIdleTimer();
+    this.chromeIdleTimer = setTimeout(() => {
+      this.chromeIdleTimer = null;
+      this.chromeIdle = true;
+      this.applyChromeIdle();
+    }, AUDIENCE_CHROME_IDLE_MS);
+    if (this.chromeIdle) {
+      this.chromeIdle = false;
+      this.applyChromeIdle();
+    }
+  };
+
+  private stopChromeIdleTimer(): void {
+    if (this.chromeIdleTimer !== null) clearTimeout(this.chromeIdleTimer);
+    this.chromeIdleTimer = null;
+  }
+
+  private applyChromeIdle(): void {
+    const hide = this.chromeIdle && this.resolveMode() === "audience";
+    setClusterHidden(
+      this.chrome?.querySelector<HTMLElement>("[data-hf-nav-cluster]") ?? null,
+      hide,
+    );
+    this.toggleAttribute("data-hf-chrome-idle", hide);
+    this.style.cursor = hide ? "none" : "";
+    setFrameCursorHidden(this.keyForwardFrame, hide);
   }
 
   // Builds the nav cluster ([mute?] [prev] counter [next] | [present?] [fullscreen]) as a
