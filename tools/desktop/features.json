@@ -198,8 +198,8 @@
       "name": "Highlights from a long video (AutoClip)",
       "bullets": [
         "Finds and scores the best moments in a long talk or stream",
-        "Cuts each to its own clip and groups them by theme",
-        "Needs a model: local Ollama or your free Gemini key"
+        "Clips land next to the video, best first, with their transcript",
+        "Uses your free Gemini key; about 3 minutes for a 5-minute video"
       ],
       "ask": "find the best highlights in this long video"
     },

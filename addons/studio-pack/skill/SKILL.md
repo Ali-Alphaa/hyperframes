@@ -190,10 +190,16 @@ best self-contained moments in a long talk or stream, scores them, cuts each to 
 themed collections (AutoClip, clone in `~/video-pipeline/addons/autoclip`, env `.autoclip-venv`). Subtitles come
 from the local faster-whisper worker (an `.srt` next to the video is reused).
 
-- It needs a language model: a running Ollama (local, nothing leaves the PC) is used first, else Gemini with the
-  user's `GEMINI_API_KEY`, else it stops and says how to set one up. Never ask for or handle a key.
-- AutoClip's prompts are Chinese, so its titles can come back in Chinese: use its timings, scores and reasons, and
-  write the English titles yourself. Lower `--min-score` (e.g. 0.5) when it returns no clips.
+- It needs a language model: a running Ollama (local, nothing leaves the PC) is used first, else Gemini
+  (`gemini-3.5-flash`; 2.5-flash is closed to new keys) with the user's `GEMINI_API_KEY`, else it stops and says how
+  to set one up. Never ask for, print or handle a key. AutoClip writes the key into its `cli-settings.json`; the
+  bridge blanks it after every run.
+- Results: `<video>-highlights/` next to the video, clips named `NN-scoreSS-MmSSs.mp4` best first, and
+  `highlights.json` with each clip's times, score, English transcript (`spoken`) and AutoClip's own title and reason.
+  AutoClip's prompts are Chinese, so its titles and reasons come back in Chinese: write English titles from `spoken`.
+- Read each clip's `spoken` before using it: AutoClip sometimes starts a clip mid-sentence ("and we can go with
+  it..."). Trim or extend with the transcript times. Lower `--min-score` (e.g. 0.5) when it returns no clips.
+- About 3 minutes for a 5-minute video (transcription plus five model steps).
 - Don't use its `publish` (Upload-Post), `produce --browser` (reads browser cookies) or `mcp install`. Publishing
   goes through `studio_publish.py` with the user's approval.
 - For one clip, the Shorts Generator is simpler; this is for many clips from one long video. Then reframe and

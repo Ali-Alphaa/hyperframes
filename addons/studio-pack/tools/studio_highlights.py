@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -81,7 +82,7 @@ def pick_provider(provider: str | None, model: str | None) -> tuple[list[str], d
         if not key:
             sys.exit("GEMINI_API_KEY isn't set. The user saves it themselves.")
         env["AUTOCLIP_API_KEY"] = key
-        model = model or "gemini-2.5-flash"
+        model = model or "gemini-3.5-flash"  # 2.5-flash is closed to new keys
     elif provider not in ("ollama", "lmstudio"):
         key = user_setting("AUTOCLIP_API_KEY")
         if not key:
@@ -91,17 +92,70 @@ def pick_provider(provider: str | None, model: str | None) -> tuple[list[str], d
     return args, env
 
 
+def forget_keys(settings: Path) -> None:
+    """AutoClip writes the key into cli-settings.json in plain text to start its model client; blank it afterwards."""
+    if not settings.exists():
+        return
+    data = json.loads(settings.read_text(encoding="utf-8"))
+    data.update({k: "" for k in data if k.endswith("_api_key")})
+    settings.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def run(video: Path, category: str, min_score: float, provider: str | None, model: str | None) -> dict:
     model_args, extra_env = pick_provider(provider, model)
     srt = transcribe(video, video.with_suffix(".srt"))
     env = {**os.environ, **extra_env, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "AUTOCLIP_DATA_DIR": str(DATA)}
     cmd = [str(AUTOCLIP_PY), "-m", "backend.cli", "run", str(video), "--srt", str(srt), "--category", category,
            "--min-score", str(min_score), "--copy", "--no-db", "--json", *model_args]
-    proc = subprocess.run(cmd, cwd=AUTOCLIP, env=env, capture_output=True, text=True, encoding="utf-8")
+    try:
+        proc = subprocess.run(cmd, cwd=AUTOCLIP, env=env, capture_output=True, text=True, encoding="utf-8")
+    finally:
+        forget_keys(DATA / "cli-settings.json")
     start = proc.stdout.find("{")
     if start < 0:
         sys.exit(f"AutoClip failed:\n{proc.stderr[-2000:]}")
     return json.loads(proc.stdout[start:])
+
+
+def srt_seconds(stamp: str) -> float:
+    h, m, rest = stamp.replace(",", ".").split(":")
+    return int(h) * 3600 + int(m) * 60 + float(rest)
+
+
+def spoken_between(srt: Path, start: float, end: float) -> str:
+    """The subtitle text inside [start, end], for writing titles in the video's own language."""
+    lines = []
+    for block in srt.read_text(encoding="utf-8").strip().split("\n\n"):
+        parts = block.splitlines()
+        if len(parts) >= 3 and " --> " in parts[1]:
+            a, b = (srt_seconds(t) for t in parts[1].split(" --> "))
+            if a >= start - 0.05 and b <= end + 0.05:
+                lines.append(" ".join(parts[2:]))
+    return " ".join(lines)
+
+
+def collect(result: dict, video: Path) -> Path:
+    """Copies the clips next to the video as <video>-highlights/NN-scoreSS-MmSSs.mp4, best first, with highlights.json
+    (times, score, AutoClip's own title and reason, which may be Chinese, and the English transcript of each clip)."""
+    out = video.parent / f"{video.stem}-highlights"
+    out.mkdir(exist_ok=True)
+    srt = video.with_suffix(".srt")
+    rows = []
+    clips = sorted(result.get("clips", []), key=lambda c: -c.get("score", 0))
+    for n, clip in enumerate(clips, 1):
+        start, end = srt_seconds(clip["start_time"]), srt_seconds(clip["end_time"])
+        name = f"{n:02d}-score{clip.get('score_100', 0)}-{int(start // 60)}m{int(start % 60):02d}s.mp4"
+        if clip.get("file") and Path(clip["file"]).exists():
+            shutil.copy2(clip["file"], out / name)
+        rows.append({"file": name, "start": start, "end": end, "seconds": round(end - start, 1),
+                     "score": clip.get("score"), "spoken": spoken_between(srt, start, end) if srt.exists() else "",
+                     "autoclip_title": clip.get("title"), "autoclip_reason": clip.get("reason"),
+                     "id": clip.get("id")})
+    groups = [{"title": c.get("title"), "summary": c.get("summary"), "clip_ids": c.get("clip_ids")}
+              for c in result.get("collections", [])]
+    (out / "highlights.json").write_text(json.dumps({"video": str(video), "clips": rows, "collections": groups},
+                                                    ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
 
 
 def main() -> None:
@@ -114,7 +168,10 @@ def main() -> None:
     ap.add_argument("--provider")
     ap.add_argument("--model")
     a = ap.parse_args()
+    sys.stdout.reconfigure(encoding="utf-8")  # AutoClip's titles can be Chinese; the Windows console code page can't print them
     result = run(a.video.resolve(), a.category, a.min_score, a.provider, a.model)
+    if result.get("ok"):
+        result["highlights_dir"] = str(collect(result, a.video.resolve()))
     print(json.dumps(result, ensure_ascii=False, indent=2))
     sys.exit(0 if result.get("ok") else 1)
 
