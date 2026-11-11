@@ -4,15 +4,16 @@ A fork add-on that brings DaVinci Resolve 21-style finishing tools to HyperFrame
 own code. Everything lives in this folder, so merging HeyGen's updates never conflicts with it. The plan behind it
 is the "HyperFrames Studio Pack plan" doc.
 
-| Batch             | Status  | What                                                                                                  |
-| ----------------- | ------- | ----------------------------------------------------------------------------------------------------- |
-| 1 Audio + presets | done    | `clean`, `level`, `beats`, `snap`, `duck`, platform export                                            |
-| 2 Footage editing | done    | smart reframe; DeepFilterNet voice cleanup (text cuts and silence removal already exist in media-use) |
-| 3 Fixes + color   | planned | stabilise, slow-motion, denoise, auto-correct, shot matching                                          |
-| 4 Motion blocks   | planned | audio-reactive, Lottie, picture-in-picture, loop easing                                               |
-| 5 Voice cloning   | planned | local clone of your own voice                                                                         |
-| 6 Footage search  | done    | index a folder (faster-whisper + CLIP), search spoken or visual, contact sheet, export                |
-| 7 Publishing      | done    | Postiz drafts, approve/cancel with a log, Buffer route for TikTok and Instagram                       |
+| Batch             | Status | What                                                                                                  |
+| ----------------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| 1 Audio + presets | done   | `clean`, `level`, `beats`, `snap`, `duck`, platform export                                            |
+| 2 Footage editing | done   | smart reframe; DeepFilterNet voice cleanup (text cuts and silence removal already exist in media-use) |
+| 3 Fixes + color   | done   | stabilise, slow-motion, denoise, auto-correct, shot matching                                          |
+| 4 Motion blocks   | done   | audio-reactive, Lottie, picture-in-picture, loop easing                                               |
+| 5 Voice cloning   | done   | local clone of your own voice                                                                         |
+| 6 Footage search  | done   | index a folder (faster-whisper + CLIP), search spoken or visual, contact sheet, export                |
+| 7 Publishing      | done   | Postiz drafts, approve/cancel with a log, Buffer route for TikTok and Instagram                       |
+| 8 Repo add-ons    | done   | AutoClip highlights bridge; render checks (word diff, A/V length, flicker) from claude-youtube-editor |
 
 ## Setup
 
@@ -76,6 +77,17 @@ uv pip install --python ~/video-pipeline/.f5-venv/Scripts/python.exe f5-tts soun
 
 Keep OpenCV below 5 (Real-ESRGAN's package pulls in the newest, and OpenCV 5 dropped the face detector reframe
 falls back on).
+
+AutoClip (batch 8) runs from a clone in its own environment; its prompts pick moments with a language model
+(local Ollama, or Gemini with the user's `GEMINI_API_KEY`):
+
+```bash
+git clone --depth 1 https://github.com/zhouxiaoka/autoclip.git ~/video-pipeline/addons/autoclip
+UV_PYTHON_INSTALL_DIR=~/video-pipeline/.python uv venv --python 3.11 ~/video-pipeline/.autoclip-venv
+uv pip install --python ~/video-pipeline/.autoclip-venv/Scripts/python.exe -r ~/video-pipeline/addons/autoclip/requirements.txt
+```
+
+`tools/scan_flicker.py` is vendored unchanged from https://github.com/hassancs91/claude-youtube-editor (MIT).
 
 ## Tests
 

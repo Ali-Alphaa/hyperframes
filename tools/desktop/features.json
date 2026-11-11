@@ -1,0 +1,311 @@
+{
+  "note": "Shown by HyperFramesFeatures.ps1. Paths may use ~ (home) and %DESKTOP%.",
+  "features": [
+    {
+      "group": "HyperFrames",
+      "name": "Studio (edit and preview a project)",
+      "bullets": [
+        "Opens a project in its own window with a timeline and live preview",
+        "Scrub, play and check every scene before rendering",
+        "Opened from the 'HyperFrames Fork' desktop shortcut"
+      ],
+      "ask": "open my project in Studio"
+    },
+    {
+      "group": "HyperFrames",
+      "name": "Render to MP4",
+      "bullets": [
+        "Turns a project into a finished video file",
+        "Same result as the Studio preview, frame for frame"
+      ],
+      "ask": "render this project to MP4"
+    },
+    {
+      "group": "HyperFrames",
+      "name": "Auto captions",
+      "bullets": [
+        "Transcribes the voice with Whisper on your PC",
+        "Adds word-timed captions you can restyle"
+      ],
+      "ask": "add captions to this video"
+    },
+    {
+      "group": "HyperFrames",
+      "name": "Text-based editing (transcript-cut)",
+      "bullets": [
+        "Edit the video by deleting words from its transcript",
+        "Removes silences and 'um's automatically"
+      ],
+      "ask": "cut the silences and ums from this clip"
+    },
+    {
+      "group": "HyperFrames",
+      "name": "Catalog blocks",
+      "bullets": [
+        "Ready-made scenes: charts, titles, lower thirds, transitions",
+        "Added straight into a project"
+      ],
+      "ask": "add a data-chart block to my project"
+    },
+    {
+      "group": "Studio Pack - audio",
+      "name": "Voice cleanup",
+      "bullets": [
+        "Removes noise, hum and echo with DeepFilterNet on your PC",
+        "Paid option: ElevenLabs Voice Isolator, only if you set its key"
+      ],
+      "ask": "clean up this voice recording"
+    },
+    {
+      "group": "Studio Pack - audio",
+      "name": "Dialogue leveling",
+      "bullets": ["Evens out loud and quiet phrases", "Finishes at a standard loudness"],
+      "ask": "even out the voice levels"
+    },
+    {
+      "group": "Studio Pack - audio",
+      "name": "Beats and snap to beat",
+      "bullets": [
+        "Finds the beats even in soft music",
+        "Moves scene changes onto the beat, keeping a backup"
+      ],
+      "ask": "snap the scene changes to the beat"
+    },
+    {
+      "group": "Studio Pack - audio",
+      "name": "Auto-ducking",
+      "bullets": ["Lowers the music while someone speaks", "Raises it again in the gaps"],
+      "ask": "duck the music under the voice"
+    },
+    {
+      "group": "Studio Pack - footage",
+      "name": "Smart reframe to vertical",
+      "bullets": [
+        "Turns wide footage into 9:16 following the speaker",
+        "Holds still for small moves and through camera pans"
+      ],
+      "ask": "make this clip vertical, following the speaker"
+    },
+    {
+      "group": "Studio Pack - footage",
+      "name": "Stabilise",
+      "bullets": ["Steadies shaky footage", "Zooms in slightly to hide the moving edges"],
+      "ask": "steady this clip"
+    },
+    {
+      "group": "Studio Pack - footage",
+      "name": "Denoise grain",
+      "bullets": ["Cleans up grainy or low-light footage"],
+      "ask": "clean up the grain"
+    },
+    {
+      "group": "Studio Pack - footage",
+      "name": "Smooth slow motion",
+      "bullets": ["Invents in-between frames with RIFE on your GPU", "Or smooths a clip to 60 fps"],
+      "ask": "make this 4x slow motion"
+    },
+    {
+      "group": "Studio Pack - footage",
+      "name": "Upscale",
+      "bullets": [
+        "Enlarges footage 2x or 4x with Real-ESRGAN on your GPU",
+        "Sharper than plain enlarging, but slower"
+      ],
+      "ask": "upscale this to 2x"
+    },
+    {
+      "group": "Studio Pack - colour",
+      "name": "Auto-correct colour",
+      "bullets": ["Fixes colour casts and exposure", "Keeps a little of the clip's natural warmth"],
+      "ask": "fix the colour of this clip"
+    },
+    {
+      "group": "Studio Pack - colour",
+      "name": "Match shots and LUTs",
+      "bullets": ["Makes clip B look like clip A", "Applies any .cube LUT"],
+      "ask": "match clip B to clip A"
+    },
+    {
+      "group": "Studio Pack - motion",
+      "name": "Audio-reactive bars and pulse",
+      "bullets": ["Bars or a logo that move with the music or voice"],
+      "ask": "add bars that move with the music"
+    },
+    {
+      "group": "Studio Pack - motion",
+      "name": "Picture-in-picture",
+      "bullets": ["Puts a second clip in a corner, rounded or circular", "Slides in and out"],
+      "ask": "put the webcam clip in the top-right corner"
+    },
+    {
+      "group": "Studio Pack - motion",
+      "name": "Lottie animations and loops",
+      "bullets": [
+        "Plays any LottieFiles animation once, looping or ping-pong",
+        "Bob, pulse and loop motion that keeps the timeline length right"
+      ],
+      "ask": "add this LottieFiles animation, looping"
+    },
+    {
+      "group": "Studio Pack - voice",
+      "name": "Record your voice sample",
+      "bullets": [
+        "Finds your Rode mic and tests the level first",
+        "Saves to the recordings folder"
+      ],
+      "ask": "double-click 'Record voice sample' on the Desktop",
+      "open": "%DESKTOP%\\Record voice sample.cmd"
+    },
+    {
+      "group": "Studio Pack - voice",
+      "name": "Your cloned voice",
+      "bullets": [
+        "Voices any script in your own voice with F5-TTS, keeping your accent",
+        "Pace set to 166 words a minute; ask to change it"
+      ],
+      "ask": "voice this script in my voice"
+    },
+    {
+      "group": "Studio Pack - finishing",
+      "name": "Footage search",
+      "bullets": [
+        "Indexes a folder of clips",
+        "Finds moments by what's said or what's on screen",
+        "Cuts the moment out as a clip"
+      ],
+      "ask": "find the clip where I say pullback"
+    },
+    {
+      "group": "Studio Pack - finishing",
+      "name": "Platform export",
+      "bullets": [
+        "YouTube, Shorts, TikTok, Reels and X versions in one go",
+        "Right sizes and loudness for each"
+      ],
+      "ask": "export for Shorts, TikTok, Reels, YouTube and X"
+    },
+    {
+      "group": "Studio Pack - finishing",
+      "name": "Publishing with approval",
+      "bullets": [
+        "Drafts posts in Postiz (X) and Buffer (TikTok, Instagram)",
+        "Nothing is scheduled until you say yes to that post"
+      ],
+      "ask": "draft posts for this video on X, TikTok and Instagram"
+    },
+    {
+      "group": "Studio Pack - finishing",
+      "name": "Highlights from a long video (AutoClip)",
+      "bullets": [
+        "Finds and scores the best moments in a long talk or stream",
+        "Cuts each to its own clip and groups them by theme",
+        "Needs a model: local Ollama or your free Gemini key"
+      ],
+      "ask": "find the best highlights in this long video"
+    },
+    {
+      "group": "Studio Pack - finishing",
+      "name": "Check a finished render",
+      "bullets": [
+        "Re-listens to the render and lists extra, missing or changed words against the script",
+        "Checks audio and video lengths match",
+        "Finds 1-2 frame flickers"
+      ],
+      "ask": "check this render against the script"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Shorts Generator",
+      "bullets": [
+        "Finds the best moment in a long video",
+        "Cuts it to a vertical short with the speaker centred"
+      ],
+      "ask": "make a short from this long video"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Kinocut",
+      "bullets": [
+        "Quick trims, merges, speed changes and text overlays",
+        "Quality check before you publish"
+      ],
+      "ask": "use kinocut to trim this clip to 0:10-0:40"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Vox-style explainer",
+      "bullets": ["Turns a document into a Vox-style explainer video"],
+      "ask": "make a Vox-style explainer from this document"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Designed captions",
+      "bullets": ["Cinematic and 3D camera captions", "Styled to match the video"],
+      "ask": "add cinematic captions to this video"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Motion reel",
+      "bullets": ["Fast-cut motion graphics reels"],
+      "ask": "make a motion reel for my channel"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Sprite avatar",
+      "bullets": [
+        "Animated cartoon presenter from character artwork",
+        "Not a realistic talking head"
+      ],
+      "ask": "add a sprite avatar presenter"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Ghost editor",
+      "bullets": [
+        "Edits talking-head footage with B-roll",
+        "Needs a Gemini key; built for Macs, may stop on Windows"
+      ],
+      "ask": "ghost-edit this talking-head clip"
+    },
+    {
+      "group": "Add-ons",
+      "name": "Herk Edit Kit",
+      "bullets": [
+        "A full edit kit with its own HyperFrames version",
+        "Start Claude in its folder to use it"
+      ],
+      "ask": "start Claude in addons\\herk-edit-kit",
+      "open": "~\\video-pipeline\\addons\\herk-edit-kit"
+    },
+    {
+      "group": "Research",
+      "name": "Web, YouTube and Reddit research (Agent Reach)",
+      "bullets": [
+        "Reads YouTube video details and subtitles",
+        "Searches the web and reads pages; public Reddit/X search",
+        "Read-only, no logins; free search has an hourly limit"
+      ],
+      "ask": "research what people are saying about pullback trading"
+    },
+    {
+      "group": "Research",
+      "name": "Outlier posts and trends (ScrapeCreators)",
+      "bullets": [
+        "Finds posts that beat a creator's usual numbers, and why",
+        "Trending topics, hashtags, sounds and formats in your niche",
+        "Needs your paid SCRAPECREATORS_API_KEY"
+      ],
+      "ask": "find outlier trading videos on TikTok this month"
+    },
+    {
+      "group": "Research",
+      "name": "Comments and competitors (ScrapeCreators)",
+      "bullets": [
+        "Mines comments for questions, objections and audience language",
+        "Compares competitors' content pillars and gaps",
+        "Tears down a creator or their ads"
+      ],
+      "ask": "mine the comments on this video for questions people ask"
+    }
+  ]
+}

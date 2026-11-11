@@ -3,7 +3,7 @@ name: studio-pack
 description: Fork add-on with DaVinci Resolve-style finishing tools for HyperFrames projects. Use for voice cleanup (noise, hum, echo), dialogue leveling, beat detection when `hyperframes beats` finds none, snapping cuts to beats, auto-ducking music under voice clips, and exporting one render to YouTube, Shorts, TikTok, Reels and X specs. Use before publishing any video.
 ---
 
-# Studio Pack (all 7 batches: audio, export, reframe, footage fixes, colour, motion, voice, search, publishing)
+# Studio Pack (audio, export, reframe, footage fixes, colour, motion, voice, search, highlights, render checks, publishing)
 
 Tools live in the fork at `addons/studio-pack/tools/`. Run them with the shared environment:
 
@@ -182,6 +182,41 @@ $PY $PACK/studio_search.py export footage/ "pullback" --spoken --pick 1 --out as
   and the top hit isn't always the one the user means. Blank and fade frames are left out automatically.
 - Re-run `index` after adding footage. The index is in `<folder>/.studio-index/` (a few MB); delete it to rebuild.
 - Transcription runs in `~/video-pipeline/.venv` (faster-whisper), CLIP in `~/video-pipeline/.voice-venv` (GPU).
+
+## Highlights from a long video (AutoClip)
+
+`tools/studio_highlights.py VIDEO [--category knowledge|business|opinion|speech|...] [--min-score 0.7]` finds the
+best self-contained moments in a long talk or stream, scores them, cuts each to its own file and groups them into
+themed collections (AutoClip, clone in `~/video-pipeline/addons/autoclip`, env `.autoclip-venv`). Subtitles come
+from the local faster-whisper worker (an `.srt` next to the video is reused).
+
+- It needs a language model: a running Ollama (local, nothing leaves the PC) is used first, else Gemini with the
+  user's `GEMINI_API_KEY`, else it stops and says how to set one up. Never ask for or handle a key.
+- AutoClip's prompts are Chinese, so its titles can come back in Chinese: use its timings, scores and reasons, and
+  write the English titles yourself. Lower `--min-score` (e.g. 0.5) when it returns no clips.
+- Don't use its `publish` (Upload-Post), `produce --browser` (reads browser cookies) or `mcp install`. Publishing
+  goes through `studio_publish.py` with the user's approval.
+- For one clip, the Shorts Generator is simpler; this is for many clips from one long video. Then reframe and
+  export the chosen clips as usual.
+
+## Check a finished render
+
+`tools/studio_verify.py all RENDER [--expect script.txt] [--crops DIR]` (ideas from claude-youtube-editor):
+
+- `words`: re-transcribes the render and diffs it against the intended words (the voiceover script, or the kept
+  transcript after a text cut). Reports extra words (ghost "um"s that rode along), missing or changed words with
+  times, long pauses and unclear words. Run it after every transcript-cut or voiceover render.
+- `av`: audio and video stream lengths agree within 0.1 s.
+- `flicker`: 1-2 frame blinks in the rendered file (vendored `scan_flicker.py`), e.g. a caption vanishing for a
+  frame from parallel rendering. Look at each event (`--crops`) before calling it a fault: a stamp, flash or shake
+  that lasts a frame on purpose is flagged too.
+  All advisory: say where to look or listen; exit code 1 when anything is flagged.
+
+## Research before scripting
+
+Topic and competitor research uses the `agent-reach-research` skill (read-only, no logins) and, with the user's
+`SCRAPECREATORS_API_KEY`, the ScrapeCreators skills (`outlier-post-finder`, `comment-mining`, `trend-discovery`,
+`transcript-intelligence` and others).
 
 ## Export for platforms (after the final render)
 
