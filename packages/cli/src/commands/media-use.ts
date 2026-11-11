@@ -1,10 +1,11 @@
 import { defineCommand } from "../utils/defineCommand.js";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { finishCommand } from "../utils/commandResult.js";
 import { withMediaAuthEnvironment } from "../auth/media-environment.js";
+import { trustedPathDirs } from "@hyperframes/parsers/ff-binaries";
 
 const MEDIA_USE_ARGS = {
   type: { type: "string", description: "What to find: bgm, sfx, image, icon, logo, voice" },
@@ -75,6 +76,21 @@ export function mediaUseVerbFlags(verb: MediaUseVerb): string[] {
   return verb === "resolve" ? [] : [`--${verb}`];
 }
 
+function withOnlyTrustedPathFolders(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const pathKey = Object.keys(env).find((name) => name.toUpperCase() === "PATH");
+  if (!pathKey) return env;
+  return { ...env, [pathKey]: trustedPathDirs(env[pathKey]).join(delimiter) };
+}
+
+export function mediaUseEngineEnv(
+  env: NodeJS.ProcessEnv,
+  entry: string | undefined = process.argv[1],
+): NodeJS.ProcessEnv {
+  const scoped = withOnlyTrustedPathFolders(env);
+  if (!entry || /\.[cm]?ts$/.test(entry)) return scoped;
+  return { ...scoped, HYPERFRAMES_CLI_ENTRY: resolve(entry) };
+}
+
 type InvokeMediaUse = (verb: MediaUseVerb) => never | Promise<never>;
 
 async function invokeEngine(verb: MediaUseVerb): Promise<never> {
@@ -84,7 +100,7 @@ async function invokeEngine(verb: MediaUseVerb): Promise<never> {
   const result = await withMediaAuthEnvironment((env) =>
     spawnSync(process.execPath, [resolveMediaUseEnginePath(here), ...flag, ...passed], {
       stdio: "inherit",
-      env,
+      env: mediaUseEngineEnv(env),
     }),
   );
   if (result.error) throw result.error;

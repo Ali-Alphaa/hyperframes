@@ -56,16 +56,8 @@ pre-commit:
       # other packages enforce size discipline via code review and convention.
       glob: "packages/studio/**/*.{ts,tsx}"
       exclude: "(\\.test\\.(ts|tsx)$|\\.generated\\.)"
-      run: |
-        for f in {staged_files}; do
-          # Skip test and generated files (exclude pattern backup in case lefthook doesn't filter)
-          case "$f" in *.test.ts|*.test.tsx|*.generated.*) continue ;; esac
-          lines=$(wc -l < "$f")
-          if [ "$lines" -gt 600 ]; then
-            echo "ERROR: $f has $lines lines (max 600)"
-            exit 1
-          fi
-        done
+      # Fork: a Node script, because lefthook mangled the inline shell loop on Windows.
+      run: node scripts/check-studio-filesize.mjs {staged_files}
 
 commit-msg:
   commands:

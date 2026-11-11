@@ -625,6 +625,7 @@ export const coreRules: Array<(ctx: LintContext) => HyperframeLintFinding[]> = [
       return [];
     }
     if (/(?:^|\s)data-no-timeline(?=[\s=/]|$)/i.test(rootTag?.attrs || "")) return [];
+    if (options.scriptsOutsideProjectUnread?.length) return [];
     const findings: HyperframeLintFinding[] = [];
     const registered = [source, ...(options.externalScripts ?? []).map((script) => script.content)];
     if (
@@ -962,6 +963,11 @@ export const coreRules: Array<(ctx: LintContext) => HyperframeLintFinding[]> = [
       {
         pattern: /crypto\.getRandomValues\s*\(/,
         label: "crypto.getRandomValues()",
+        hint: "Use a seeded PRNG (e.g. a simple mulberry32) so renders are deterministic across frames.",
+      },
+      {
+        pattern: /crypto\.randomUUID\s*\(/,
+        label: "crypto.randomUUID()",
         hint: "Use a seeded PRNG (e.g. a simple mulberry32) so renders are deterministic across frames.",
       },
       {

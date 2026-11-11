@@ -42,6 +42,7 @@ import type { ResolvedProject, StudioApiAdapter } from "../types.js";
 import {
   isPrivateProjectFile,
   isProjectRootMissing,
+  projectRelativePath,
   resolveWithinProject,
 } from "../helpers/safePath.js";
 import { getMimeType } from "../helpers/mime.js";
@@ -101,6 +102,7 @@ import {
 } from "../helpers/mediaProxyPreview.js";
 import { requestSubPath } from "../helpers/requestSubPath.js";
 import { lazyPreviewImages } from "../helpers/lazyPreviewImages.js";
+import { corsProjectVideos } from "../helpers/captureVideos.js";
 
 const PROJECT_SIGNATURE_META = "hyperframes-project-signature";
 function escapeGsapUrl(url: string): string {
@@ -150,10 +152,10 @@ function parseStudioMotionManifestContent(content: string): {
   }
 }
 
-/** Swaps any runtime already in the page for the preview runtime, placed as the bundler places it. */
+/** Preview hooks must install before authored head scripts register media consumers. */
 function withPreviewRuntime(html: string, runtimeUrl: string): string {
   const tag = `<script ${RUNTIME_BOOTSTRAP_ATTR}="1" src="${runtimeUrl}"></script>`;
-  return insertRuntimeTag(stripEmbeddedRuntimeScripts(html), tag);
+  return insertRuntimeTag(stripEmbeddedRuntimeScripts(html), tag, true);
 }
 
 function injectScriptTagIntoHead(html: string, scriptTag: string): string {
@@ -371,11 +373,11 @@ function injectStudioPreviewAugmentations(
   signature: string,
   projectDir: string,
   activeCompositionPath: string,
-  options: { capture: boolean; gsapBaseUrl: string },
+  options: { capture: boolean; gsapBaseUrl: string; sandboxedCapture: boolean },
 ): string {
   const marked = options.capture
     ? injectTagsAtHeadStart(
-        html,
+        options.sandboxedCapture ? corsProjectVideos(html) : html,
         `<meta name="${STUDIO_PREVIEW_MARK_META}" content="${STUDIO_PREVIEW_CAPTURE_MODE}">`,
       )
     : injectTagsAtHeadStart(
@@ -481,7 +483,11 @@ function resolvePreviewGsapBaseUrl(adapter: PreviewApiAdapter): string {
   return normalizeGsapLocalRoot(adapter.gsapLocalRoot);
 }
 
-export function registerPreviewRoutes(api: Hono, adapter: PreviewApiAdapter): void {
+export function registerPreviewRoutes(
+  api: Hono,
+  adapter: PreviewApiAdapter,
+  { sandboxThumbnailCaptures = false }: { sandboxThumbnailCaptures?: boolean } = {},
+): void {
   const gsapBaseUrl = resolvePreviewGsapBaseUrl(adapter);
   const gsapEtagSalt = `:gsap:${createHash("sha1").update(gsapBaseUrl).digest("hex").slice(0, 12)}`;
   const previewCacheHeaders = (etag: string) => ({
@@ -539,7 +545,7 @@ export function registerPreviewRoutes(api: Hono, adapter: PreviewApiAdapter): vo
         signature,
         project.dir,
         mainCompositionPath,
-        { capture, gsapBaseUrl },
+        { capture, gsapBaseUrl, sandboxedCapture: sandboxThumbnailCaptures },
       );
       if (previewVariables) bundled = injectPreviewVariables(bundled, previewVariables);
       bundled = await injectMediaCodecMap(
@@ -570,7 +576,7 @@ export function registerPreviewRoutes(api: Hono, adapter: PreviewApiAdapter): vo
           signature,
           project.dir,
           fallback.compositionPath,
-          { capture, gsapBaseUrl },
+          { capture, gsapBaseUrl, sandboxedCapture: sandboxThumbnailCaptures },
         );
         if (previewVariables) {
           fallbackAugmented = injectPreviewVariables(fallbackAugmented, previewVariables);
@@ -649,14 +655,17 @@ export function registerPreviewRoutes(api: Hono, adapter: PreviewApiAdapter): vo
     const vars = previewVariablesFromRequest(c.req.query("variables"));
     if (vars.error !== undefined) return c.json({ error: vars.error }, 400);
     const previewVariables = vars.values;
-    const compPath = requestSubPath(c.req.url, "projects/:id/preview/comp");
-    const compFile = resolveWithinProject(project.dir, compPath);
+    const compFile = resolveWithinProject(
+      project.dir,
+      requestSubPath(c.req.url, "projects/:id/preview/comp"),
+    );
     if (compFile) recordPreviewRead(project.dir, compFile);
     // The sub-composition document takes its head from the root.
     recordPreviewRead(project.dir, "index.html");
     if (!compFile || !existsSync(compFile) || !statSync(compFile).isFile()) {
       return c.text("not found", 404);
     }
+    const compPath = projectRelativePath(project.dir, compFile);
 
     // "v2" salts the etag for the hf-id-pinning change below: a client holding
     // a pre-pin cached response (preview-only ids, unstamped disk file) must
@@ -685,12 +694,13 @@ export function registerPreviewRoutes(api: Hono, adapter: PreviewApiAdapter): vo
       gsapBaseUrl,
     );
     if (!html) return c.text("not found", 404);
-    html = withRootImportMap(html, baseHref);
+    html = withPreviewRuntime(withRootImportMap(html, baseHref), adapter.runtimeUrl);
     recordPreviewReferences(project.dir, html);
     html = ensureHfIds(await transformPreviewHtml(html, adapter, project, compPath));
     html = injectStudioPreviewAugmentations(html, adapter, signature, project.dir, compPath, {
       capture,
       gsapBaseUrl,
+      sandboxedCapture: sandboxThumbnailCaptures,
     });
     if (previewVariables) html = injectPreviewVariables(html, previewVariables);
     html = await injectMediaCodecMap(html, adapter, project.dir, compPath, mediaCodecProbeCache);
