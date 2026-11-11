@@ -49,8 +49,10 @@ project again replaces the earlier server. Shortcuts start the launcher through 
 Terminal shows a window for it that kills the launcher when closed.
 
 With no project, the launcher opens a HyperFrames home screen in the Studio window (`project-home.mjs` and
-`project-home.html`): recent and found projects (from the `videos` folders), a search box and "Other folder…" for the
-Explorer window. Picking one starts its Studio and the window moves on to it; Alt+Left comes back to the list, and
+`project-home.html`) with three tabs. Projects: recent and found projects, a search box and "Other folder…" for the
+Explorer window. Features: every entry in `features.json` with a copy button for its Claude request. Settings: where
+things are in Studio, the folders scanned for projects (add, remove, reset; saved in
+`%LOCALAPPDATA%\HyperFramesFork\settings.json`), and whether each add-on's key is set (never its value). Picking one starts its Studio and the window moves on to it; Alt+Left comes back to the list, and
 opening another project stops the previous server. `HyperFramesFork.ps1 -Pick` keeps the old Explorer-first start.
 `install-shortcut.ps1 -Name HyperFrames` makes the shortcut.
 

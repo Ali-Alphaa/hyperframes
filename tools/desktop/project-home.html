@@ -4,26 +4,52 @@
 <meta charset="utf-8">
 <title>HyperFrames Studio</title>
 <style>
-  :root { --bg: #0d0e11; --panel: #16181d; --line: #262931; --text: #e8eaf0; --dim: #8b90a0; --accent: #4f8cff; }
+  :root { --bg: #0d0e11; --panel: #16181d; --panel2: #1c1f26; --line: #262931; --text: #e8eaf0; --dim: #8b90a0;
+    --accent: #4f8cff; --ok: #3ecf8e; --warn: #f0b429; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
-  main { max-width: 980px; margin: 0 auto; padding: 40px 32px 60px; }
-  header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
-  h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
-  h2 { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 28px 0 10px; }
-  input { width: 280px; background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 8px;
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 32px 60px; }
+  header { display: flex; align-items: center; gap: 22px; margin-bottom: 22px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0; }
+  nav { display: flex; gap: 4px; flex: 1; }
+  nav button { background: none; border: 0; color: var(--dim); font: inherit; font-weight: 600; padding: 8px 14px;
+    border-radius: 8px; cursor: pointer; }
+  nav button:hover { color: var(--text); }
+  nav button.on { background: var(--panel2); color: var(--text); }
+  h2 { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 26px 0 10px; }
+  h3 { font-size: 15px; margin: 0 0 4px; }
+  input, select { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 8px;
     padding: 9px 12px; font: inherit; outline: none; }
-  input:focus { border-color: var(--accent); }
-  button.other { background: transparent; border: 1px solid var(--line); color: var(--text); border-radius: 8px;
-    padding: 9px 14px; font: inherit; cursor: pointer; }
-  button.other:hover { border-color: var(--dim); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; cursor: pointer;
-    text-align: left; color: inherit; font: inherit; transition: border-color .12s, transform .12s; }
-  .card:hover, .card:focus-visible { border-color: var(--accent); outline: none; transform: translateY(-1px); }
+  input:focus, select:focus { border-color: var(--accent); }
+  .btn { background: transparent; border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 8px 14px;
+    font: inherit; cursor: pointer; white-space: nowrap; }
+  .btn:hover { border-color: var(--dim); }
+  .btn.small { padding: 4px 10px; font-size: 12px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tools { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+  .tools input { width: 280px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; text-align: left;
+    color: inherit; font: inherit; }
+  button.card { cursor: pointer; transition: border-color .12s, transform .12s; }
+  button.card:hover, button.card:focus-visible { border-color: var(--accent); outline: none; transform: translateY(-1px); }
   .name { font-size: 15px; font-weight: 600; margin-bottom: 4px; word-break: break-word; }
   .meta { color: var(--dim); font-size: 12px; word-break: break-all; }
   .empty { color: var(--dim); padding: 30px 0; }
+  .feature ul { margin: 8px 0 12px; padding-left: 18px; color: #c6cad6; }
+  .feature li { margin: 2px 0; }
+  .ask { display: flex; gap: 8px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 6px 6px 10px; }
+  .ask span { flex: 1; font-style: italic; color: #c6cad6; font-size: 13px; }
+  .tag { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:first-child td { border-top: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  .guide { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .guide .card p { margin: 6px 0 0; color: #c6cad6; }
+  code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
   #busy { position: fixed; inset: 0; background: rgba(13,14,17,.88); display: none; align-items: center; justify-content: center;
     flex-direction: column; gap: 14px; font-size: 15px; }
   #busy.on { display: flex; }
@@ -32,25 +58,94 @@
   @keyframes s { to { transform: rotate(360deg); } }
   #error { display: none; background: #2a1517; border: 1px solid #5c2a2f; color: #ffb4b9; border-radius: 8px; padding: 10px 14px;
     margin-bottom: 16px; white-space: pre-wrap; }
-  .hint { color: var(--dim); font-size: 12px; margin-top: 36px; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ok); color: #06261a;
+    font-weight: 600; padding: 8px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+  .hint { color: var(--dim); font-size: 12px; margin-top: 30px; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>HyperFrames</h1>
-    <input id="q" placeholder="Search projects" autofocus>
-    <button class="other" id="other">Other folder…</button>
+    <nav>
+      <button data-tab="projects" class="on">Projects</button>
+      <button data-tab="features">Features</button>
+      <button data-tab="settings">Settings</button>
+    </nav>
   </header>
   <div id="error"></div>
-  <div id="list"></div>
-  <p class="hint">Tip: press Alt+← in Studio to come back here and open another project.</p>
+
+  <section id="projects">
+    <div class="tools">
+      <input id="q" placeholder="Search projects" autofocus>
+      <button class="btn" id="other">Other folder…</button>
+    </div>
+    <div id="list"></div>
+    <p class="hint">Tip: press Alt+← in Studio to come back here and open another project.</p>
+  </section>
+
+  <section id="features" hidden>
+    <div class="tools">
+      <select id="group"></select>
+      <input id="fq" placeholder="Search features">
+    </div>
+    <p class="meta">Most features are used by asking Claude. Copy a request and paste it into Claude, naming your video or project.</p>
+    <div id="flist"></div>
+  </section>
+
+  <section id="settings" hidden>
+    <h2>Where to find things in Studio</h2>
+    <div class="guide">
+      <div class="card"><h3>Top bar</h3><p>Capture and Inspector modes, light/dark theme, <b>Window</b> (which panels show) and <b>Export</b>: render format, quality and size.</p></div>
+      <div class="card"><h3>Left panel</h3><p><b>Compositions</b> (scenes), <b>Assets</b> (media files), <b>Code</b> and <b>Catalog</b> (ready-made blocks to add).</p></div>
+      <div class="card"><h3>Right panel</h3><p><b>Design</b>: position, size, colour, text and animation of whatever you select. <b>Layers</b>, and <b>Renders</b>: your finished exports.</p></div>
+      <div class="card"><h3>Timeline</h3><p>Along the bottom: play, scrub, select and trim clips, zoom with the slider.</p></div>
+      <div class="card"><h3>Project settings</h3><p>Each project's <code>hyperframes.json</code> (catalog address, folder paths, media proxies). There's no screen for these: ask Claude to change them.</p></div>
+      <div class="card"><h3>Studio Pack and add-ons</h3><p>No buttons: ask Claude. The <b>Features</b> tab lists each one with a request you can copy.</p></div>
+    </div>
+
+    <h2>Folders scanned for projects</h2>
+    <div class="panel"><table id="roots"></table></div>
+    <div class="tools" style="margin-top:10px">
+      <button class="btn" id="addRoot">Add folder…</button>
+      <button class="btn" id="resetRoots">Reset to the usual folders</button>
+      <button class="btn" id="clearRecent">Clear recent list</button>
+    </div>
+
+    <h2>Connected services</h2>
+    <div class="panel"><table id="services"></table></div>
+    <p class="meta">Keys are saved by you as Windows user settings (never typed here). This page only shows whether each is set.</p>
+
+    <h2>Locations</h2>
+    <div class="panel"><table id="places"></table></div>
+  </section>
 </main>
 <div id="busy"><div class="spin"></div><div id="busyText">Opening…</div></div>
+<div id="toast"></div>
 <script>
-  const list = document.getElementById("list"), q = document.getElementById("q");
-  let projects = [];
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  let projects = [], features = [];
 
+  const post = async (path, body) => {
+    const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
+    return r.json();
+  };
+  const toast = (text) => { $("toast").textContent = text; $("toast").classList.add("on"); setTimeout(() => $("toast").classList.remove("on"), 1600); };
+  const showError = (msg) => { $("error").textContent = msg; $("error").style.display = msg ? "block" : "none"; };
+
+  // Tabs (remembered in the address, so Alt+← from Studio lands on the same tab)
+  function showTab(name) {
+    document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+    ["projects", "features", "settings"].forEach((t) => ($(t).hidden = t !== name));
+    history.replaceState(null, "", "#tab=" + name);
+    if (name === "settings") loadSettings();
+  }
+  document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+
+  // Projects
   const ago = (ms) => {
     if (!ms) return "";
     const d = (Date.now() - ms) / 86400000;
@@ -60,60 +155,134 @@
     return "edited " + new Date(ms).toLocaleDateString();
   };
 
-  function card(p) {
-    const b = document.createElement("button");
-    b.className = "card";
-    b.innerHTML = `<div class="name"></div><div class="meta"></div><div class="meta"></div>`;
-    b.children[0].textContent = p.name;
-    b.children[1].textContent = ago(p.edited);
-    b.children[2].textContent = p.folder;
+  function projectCard(p) {
+    const b = el("button", "card");
+    b.append(el("div", "name", p.name), el("div", "meta", ago(p.edited)), el("div", "meta", p.folder));
     b.onclick = () => open("/open", { dir: p.dir }, p.name);
     return b;
   }
 
-  function section(title, items) {
+  function section(parent, title, items, make) {
     if (!items.length) return;
-    const h = document.createElement("h2");
-    h.textContent = title;
-    const g = document.createElement("div");
-    g.className = "grid";
-    items.forEach((p) => g.appendChild(card(p)));
-    list.append(h, g);
+    const g = el("div", "grid");
+    items.forEach((i) => g.appendChild(make(i)));
+    parent.append(el("h2", null, title), g);
   }
 
-  function render() {
-    const term = q.value.trim().toLowerCase();
+  function renderProjects() {
+    const term = $("q").value.trim().toLowerCase();
     const shown = projects.filter((p) => !term || (p.name + " " + p.folder).toLowerCase().includes(term));
+    const list = $("list");
     list.innerHTML = "";
     const recent = shown.filter((p) => p.recent >= 0).sort((a, b) => a.recent - b.recent);
     const rest = shown.filter((p) => p.recent < 0).sort((a, b) => b.edited - a.edited);
-    section("Recent", recent);
-    section(recent.length ? "All projects" : "Projects", rest);
-    if (!shown.length) list.innerHTML = `<div class="empty">No projects found${term ? " for “" + q.value + "”" : ""}. Use “Other folder…” to open one.</div>`;
+    section(list, "Recent", recent, projectCard);
+    section(list, recent.length ? "All projects" : "Projects", rest, projectCard);
+    if (!shown.length) list.append(el("div", "empty", `No projects found${term ? ` for “${$("q").value}”` : ""}. Use “Other folder…”, or add a folder in Settings.`));
   }
 
   async function open(path, body, name) {
-    const err = document.getElementById("error");
-    err.style.display = "none";
-    document.getElementById("busyText").textContent = name ? `Opening ${name}…` : "Choose a project in the Explorer window…";
-    document.getElementById("busy").classList.add("on");
+    showError("");
+    $("busyText").textContent = name ? `Opening ${name}…` : "Choose a project in the Explorer window…";
+    $("busy").classList.add("on");
     try {
-      const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}) });
-      const data = await r.json();
+      const data = await post(path, body);
       if (data.url) { location.href = data.url; return; }
       if (!data.cancelled) throw new Error(data.error || "Studio didn't start.");
     } catch (e) {
-      err.textContent = e.message;
-      err.style.display = "block";
+      showError(e.message);
     }
-    document.getElementById("busy").classList.remove("on");
+    $("busy").classList.remove("on");
   }
 
-  document.getElementById("other").onclick = () => open("/browse");
-  q.oninput = render;
-  q.onkeydown = (e) => { if (e.key === "Enter") list.querySelector(".card")?.click(); };
-  window.addEventListener("pageshow", () => document.getElementById("busy").classList.remove("on"));
-  fetch("/projects").then((r) => r.json()).then((p) => { projects = p; render(); });
+  $("other").onclick = () => open("/browse");
+  $("q").oninput = renderProjects;
+  $("q").onkeydown = (e) => { if (e.key === "Enter") $("list").querySelector(".card")?.click(); };
+  const loadProjects = () => fetch("/projects").then((r) => r.json()).then((p) => { projects = p; renderProjects(); });
+
+  // Features
+  function featureCard(f) {
+    const c = el("div", "card feature");
+    c.append(el("div", "tag", f.group), el("h3", null, f.name));
+    const ul = el("ul");
+    f.bullets.forEach((b) => ul.append(el("li", null, b)));
+    const ask = el("div", "ask");
+    const copy = el("button", "btn small", "Copy");
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(f.ask);
+      } catch {
+        const t = el("textarea"); t.value = f.ask; document.body.append(t); t.select(); document.execCommand("copy"); t.remove();
+      }
+      toast("Copied – paste it into Claude");
+    };
+    ask.append(el("span", null, `“${f.ask}”`), copy);
+    c.append(ul, ask);
+    return c;
+  }
+
+  function renderFeatures() {
+    const g = $("group").value, term = $("fq").value.trim().toLowerCase();
+    const shown = features.filter((f) => (!g || f.group === g) &&
+      (!term || [f.name, f.group, f.ask, ...f.bullets].join(" ").toLowerCase().includes(term)));
+    const list = $("flist");
+    list.innerHTML = "";
+    const groups = [...new Set(shown.map((f) => f.group))];
+    groups.forEach((name) => section(list, name, shown.filter((f) => f.group === name), featureCard));
+    if (!shown.length) list.append(el("div", "empty", "No features match."));
+  }
+
+  fetch("/features").then((r) => r.json()).then((d) => {
+    features = d.features;
+    const sel = $("group");
+    sel.append(new Option(`All features (${features.length})`, ""));
+    [...new Set(features.map((f) => f.group))].forEach((g) => sel.append(new Option(g, g)));
+    renderFeatures();
+  });
+  $("group").onchange = renderFeatures;
+  $("fq").oninput = renderFeatures;
+
+  // Settings
+  function row(cells) {
+    const tr = el("tr");
+    cells.forEach((c) => { const td = el("td"); if (c instanceof Node) td.append(c); else td.textContent = c; tr.append(td); });
+    return tr;
+  }
+  const reveal = (path) => { const b = el("button", "btn small", "Show"); b.onclick = () => post("/reveal", { path }); return b; };
+  const dot = (on, label) => { const s = el("span"); const d = el("span", "dot"); d.style.background = on ? "var(--ok)" : "var(--line)"; s.append(d, label); return s; };
+
+  function renderSettings(s) {
+    const roots = $("roots");
+    roots.innerHTML = "";
+    s.roots.forEach((r) => {
+      const remove = el("button", "btn small", "Remove");
+      remove.onclick = async () => { renderSettings(await post("/settings/remove-folder", { path: r.path })); loadProjects(); };
+      const actions = el("span");
+      actions.style.display = "flex"; actions.style.gap = "6px"; actions.style.justifyContent = "flex-end";
+      if (r.exists) actions.append(reveal(r.path));
+      actions.append(remove);
+      roots.append(row([r.path, r.exists ? `${r.projects} project${r.projects === 1 ? "" : "s"}` : "not on this PC", actions]));
+    });
+    if (!s.roots.length) roots.append(row(["No folders: only recent projects and “Other folder…” will show."]));
+    const services = $("services");
+    services.innerHTML = "";
+    s.services.forEach((v) => services.append(row([dot(v.set, v.name), v.use, v.set ? "set" : `not set (${v.key})`])));
+    const places = $("places");
+    places.innerHTML = "";
+    places.append(row(["Your HyperFrames fork", s.fork, reveal(s.fork)]), row(["This screen's settings and recent list", s.data, reveal(s.data)]));
+    $("clearRecent").textContent = `Clear recent list (${s.recent})`;
+  }
+
+  const loadSettings = () => fetch("/settings").then((r) => r.json()).then(renderSettings);
+  $("addRoot").onclick = async () => { renderSettings(await post("/settings/add-folder")); loadProjects(); };
+  $("resetRoots").onclick = async () => { renderSettings(await post("/settings/reset-folders")); loadProjects(); };
+  $("clearRecent").onclick = async () => { renderSettings(await post("/settings/clear-recent")); loadProjects(); };
+
+  window.addEventListener("pageshow", () => $("busy").classList.remove("on"));
+  loadProjects();
+  const tabFromHash = () => { const t = location.hash.replace("#tab=", ""); return ["features", "settings"].includes(t) ? t : "projects"; };
+  window.addEventListener("hashchange", () => showTab(tabFromHash()));
+  showTab(tabFromHash());
 </script>
 </body>
 </html>

@@ -1,5 +1,5 @@
-// HyperFrames home screen: a local page listing the user's projects. Clicking one starts that project's Studio
-// server and the page moves on to it, so the Studio window opens without a file dialog.
+// HyperFrames home screen: a local page with the user's projects, every feature (features.json) and settings.
+// Clicking a project starts its Studio server and the page moves on to it, so Studio opens without a file dialog.
 // Run by HyperFramesFork.ps1: prints {"url": ...} on its first line, stops its Studio servers on POST /shutdown.
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
@@ -13,13 +13,78 @@ const cli = resolve(here, "..", "..", "packages", "cli", "dist", "cli.js");
 const dataDir = join(process.env.LOCALAPPDATA ?? homedir(), "HyperFramesFork");
 const recentFile = join(dataDir, "recent.json");
 const desktop = join(homedir(), "OneDrive", "Desktop");
-const ROOTS = [
+const settingsFile = join(dataDir, "settings.json");
+const DEFAULT_ROOTS = [
   join(desktop, "video-pipeline", "videos"),
   join(desktop, "ClaudeTransfer", "videos"),
   join(homedir(), "Desktop", "video-pipeline", "videos"),
   "F:\\video-pipeline\\videos",
 ];
 const servers = new Set(); // PIDs of Studio servers this home screen started
+
+// Keys the add-ons use. Only whether each is set is ever reported, never its value.
+const SERVICES = [
+  { key: "GEMINI_API_KEY", name: "Gemini", use: "AutoClip highlights, ghost-editor" },
+  { key: "SCRAPECREATORS_API_KEY", name: "ScrapeCreators", use: "Social research skills (paid)" },
+  { key: "POSTIZ_API_KEY", name: "Postiz key", use: "Publishing drafts to X" },
+  { key: "POSTIZ_API_URL", name: "Postiz address", use: "Your self-hosted Postiz" },
+  {
+    key: "ELEVENLABS_API_KEY",
+    name: "ElevenLabs",
+    use: "Paid voice isolator and voices (optional)",
+  },
+];
+
+function readSettings() {
+  try {
+    return JSON.parse(readFileSync(settingsFile, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeSettings(settings) {
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(settingsFile, JSON.stringify(settings, null, 2));
+}
+
+const roots = () => readSettings().roots ?? DEFAULT_ROOTS;
+
+// The user's own setting for a key: this process's environment, else the Windows user settings saved after it started.
+function isSet(key) {
+  if (process.env[key]) return true;
+  const out = spawnSync("reg.exe", ["query", "HKCU\\Environment", "/v", key], { encoding: "utf8" });
+  return out.status === 0 && /REG_\w+\s+\S/.test(out.stdout);
+}
+
+function settingsView() {
+  const projects = findProjects();
+  return {
+    roots: roots().map((path) => ({
+      path,
+      exists: existsSync(path),
+      projects: projects.filter((p) => p.dir.toLowerCase().startsWith(path.toLowerCase() + "\\"))
+        .length,
+    })),
+    defaults: DEFAULT_ROOTS,
+    services: SERVICES.map((s) => ({ ...s, set: isSet(s.key) })),
+    recent: readRecent().length,
+    fork: resolve(here, "..", ".."),
+    data: dataDir,
+  };
+}
+
+// The Windows folder picker, for adding a folder to scan for projects.
+function pickFolder() {
+  const script = `Add-Type -AssemblyName System.Windows.Forms
+$o = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false; Opacity = 0 }; $o.Show()
+$d = New-Object System.Windows.Forms.FolderBrowserDialog
+$d.Description = 'Choose a folder that holds HyperFrames projects'
+if ($d.ShowDialog($o) -eq 'OK') { $d.SelectedPath }`;
+  return spawnSync("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
+    encoding: "utf8",
+  }).stdout.trim();
+}
 
 const isProject = (dir) =>
   existsSync(join(dir, "index.html")) && existsSync(join(dir, "hyperframes.json"));
@@ -60,7 +125,7 @@ function findProjects() {
       seen.set(key, { dir, name: basename(dir), folder: dirname(dir), edited: edited(dir) });
   };
   readRecent().forEach(add);
-  for (const root of ROOTS) {
+  for (const root of roots()) {
     if (!existsSync(root)) continue;
     for (const entry of readdirSync(root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
@@ -138,6 +203,41 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/")
       return send(res, 200, readFileSync(join(here, "project-home.html"), "utf8"), "text/html");
     if (req.method === "GET" && req.url === "/projects") return send(res, 200, findProjects());
+    if (req.method === "GET" && req.url === "/features")
+      return send(res, 200, readFileSync(join(here, "features.json"), "utf8"));
+    if (req.method === "GET" && req.url === "/settings") return send(res, 200, settingsView());
+    if (req.method === "POST" && req.url === "/settings/add-folder") {
+      const dir = pickFolder();
+      if (dir && !roots().some((r) => r.toLowerCase() === dir.toLowerCase()))
+        writeSettings({ ...readSettings(), roots: [...roots(), dir] });
+      return send(res, 200, settingsView());
+    }
+    if (req.method === "POST" && req.url === "/settings/remove-folder") {
+      const { path } = await readBody(req);
+      writeSettings({ ...readSettings(), roots: roots().filter((r) => r !== path) });
+      return send(res, 200, settingsView());
+    }
+    if (req.method === "POST" && req.url === "/settings/reset-folders") {
+      const { roots: _, ...rest } = readSettings();
+      writeSettings(rest);
+      return send(res, 200, settingsView());
+    }
+    if (req.method === "POST" && req.url === "/settings/clear-recent") {
+      writeFileSync(recentFile, "[]");
+      return send(res, 200, settingsView());
+    }
+    if (req.method === "POST" && req.url === "/reveal") {
+      // Shows a folder in Explorer: only the folders this page lists.
+      const { path } = await readBody(req);
+      const known = [
+        ...roots(),
+        ...findProjects().map((p) => p.dir),
+        dataDir,
+        resolve(here, "..", ".."),
+      ];
+      if (known.includes(path) && existsSync(path)) spawnSync("explorer.exe", [path]);
+      return send(res, 200, { ok: true });
+    }
     if (req.method === "POST" && req.url === "/open") {
       const { dir } = await readBody(req);
       if (!dir || !isProject(dir))
